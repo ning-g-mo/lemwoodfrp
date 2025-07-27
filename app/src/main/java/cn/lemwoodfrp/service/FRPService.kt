@@ -301,7 +301,7 @@ class FRPService : Service() {
         serviceScope.launch {
             try {
                 LogManager.i(TAG, "🚀 开始启动FRP进程", configId)
-                LogManager.i(TAG, "=" * 60, configId)
+                LogManager.i(TAG, "=".repeat(60), configId)
                 LogManager.i(TAG, "配置ID: $configId", configId)
                 LogManager.d(TAG, "系统信息 - Android版本: ${Build.VERSION.RELEASE}, API: ${Build.VERSION.SDK_INT}, ABI: ${Build.SUPPORTED_ABIS.joinToString()}", configId)
                 
@@ -325,7 +325,7 @@ class FRPService : Service() {
                 if (config.subdomain.isNotEmpty()) {
                     LogManager.i(TAG, "  - 子域名: ${config.subdomain}", configId)
                 }
-                LogManager.i(TAG, "-" * 40, configId)
+                LogManager.i(TAG, "-".repeat(40), configId)
                 
                 if (runningProcesses.containsKey(configId)) {
                     LogManager.w(TAG, "⚠️ 进程已在运行中，跳过启动", configId)
@@ -540,7 +540,7 @@ class FRPService : Service() {
                 LogManager.i(TAG, "  - 错误输出重定向: 已启用", configId)
                 
                 LogManager.i(TAG, "🚀 启动进程...", configId)
-                LogManager.i(TAG, "=" * 50, configId)
+                LogManager.i(TAG, "=".repeat(50), configId)
                 
                 // 尝试启动进程并捕获详细错误信息
                 val process = try {
@@ -604,7 +604,7 @@ class FRPService : Service() {
                 }
                 
                 LogManager.i(TAG, "🔍 开始进程监控...", configId)
-                LogManager.i(TAG, "=" * 50, configId)
+                LogManager.i(TAG, "=".repeat(50), configId)
                 
                 // 监控进程状态和输出
                 monitorProcess(configId, process)
