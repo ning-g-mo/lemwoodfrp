@@ -562,14 +562,10 @@ class FRPService : Service() {
                 // 更新状态
                 runningProcesses.remove(configId)
                 val status = processStatus[configId]?.copy(
-                    isRunning = false,
-                    exitCode = exitCode,
-                    endTime = System.currentTimeMillis()
+                    isRunning = false
                 ) ?: FRPStatus(
                     configId = configId,
-                    isRunning = false,
-                    exitCode = exitCode,
-                    endTime = System.currentTimeMillis()
+                    isRunning = false
                 )
                 processStatus[configId] = status
                 
@@ -583,13 +579,11 @@ class FRPService : Service() {
                 runningProcesses.remove(configId)
                 val status = processStatus[configId]?.copy(
                     isRunning = false,
-                    errorMessage = e.message,
-                    endTime = System.currentTimeMillis()
+                    errorMessage = e.message
                 ) ?: FRPStatus(
                     configId = configId,
                     isRunning = false,
-                    errorMessage = e.message,
-                    endTime = System.currentTimeMillis()
+                    errorMessage = e.message
                 )
                 processStatus[configId] = status
             }
@@ -903,31 +897,5 @@ class FRPService : Service() {
         LogManager.d(TAG, "诊断报告:\n$result")
         
         return result
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        LogManager.i(TAG, "FRP服务正在关闭...")
-        
-        serviceScope.cancel()
-        
-        // 停止所有运行中的进程 AWA
-        runningProcesses.values.forEach { process ->
-            try {
-                process.destroy()
-            } catch (e: Exception) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    process.destroyForcibly()
-                } else {
-                    process.destroy()
-                }
-            }
-        }
-        runningProcesses.clear()
-        processStatus.clear()
-        
-        // 保存日志到文件
-        LogManager.saveLogsToFile(this)
-        LogManager.i(TAG, "FRP服务已关闭 qwq")
     }
 }
