@@ -17,27 +17,26 @@
   <path android:fillColor="#FFFFFF"
         android:pathData="M72,35 L72,75 L75,75 L75,57 L82,57 Q86,57 86,47 Q86,35 82,35 Z M75,38 L82,38 Q83,38 83,47 Q83,54 82,54 L75,54 Z"/>
   
-  <!-- Network connection dots -->
-  <circle android:fillColor="#FFFFFF"
-          android:fillAlpha="0.8"
-          android:cx="20"
-          android:cy="20"
-          android:r="2"/>
-  <circle android:fillColor="#FFFFFF"
-          android:fillAlpha="0.8"
-          android:cx="88"
-          android:cy="20"
-          android:r="2"/>
-  <circle android:fillColor="#FFFFFF"
-          android:fillAlpha="0.8"
-          android:cx="20"
-          android:cy="88"
-          android:r="2"/>
-  <circle android:fillColor="#FFFFFF"
-          android:fillAlpha="0.8"
-          android:cx="88"
-          android:cy="88"
-          android:r="2"/>
+  <!-- Network connection dots (converted from circles to paths) -->
+  <!-- Circle at (20, 20) with radius 2 -->
+  <path android:fillColor="#FFFFFF"
+        android:fillAlpha="0.8"
+        android:pathData="M18,20 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"/>
+  
+  <!-- Circle at (88, 20) with radius 2 -->
+  <path android:fillColor="#FFFFFF"
+        android:fillAlpha="0.8"
+        android:pathData="M86,20 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"/>
+  
+  <!-- Circle at (20, 88) with radius 2 -->
+  <path android:fillColor="#FFFFFF"
+        android:fillAlpha="0.8"
+        android:pathData="M18,88 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"/>
+  
+  <!-- Circle at (88, 88) with radius 2 -->
+  <path android:fillColor="#FFFFFF"
+        android:fillAlpha="0.8"
+        android:pathData="M86,88 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"/>
   
   <!-- Connection lines -->
   <path android:strokeColor="#FFFFFF"
