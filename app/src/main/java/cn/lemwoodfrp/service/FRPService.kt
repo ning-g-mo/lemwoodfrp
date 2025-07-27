@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import cn.lemwoodfrp.LemwoodFRPApplication
@@ -125,8 +126,12 @@ class FRPService : Service() {
                     isRunning = false
                 )
             } catch (e: Exception) {
-                // 强制杀死进程
-                process.destroyForcibly()
+                // 强制杀死进程 qwq
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    process.destroyForcibly()
+                } else {
+                    process.destroy()
+                }
                 runningProcesses.remove(configId)
             }
         }
@@ -217,12 +222,16 @@ class FRPService : Service() {
         super.onDestroy()
         serviceScope.cancel()
         
-        // 停止所有运行中的进程
+        // 停止所有运行中的进程 AWA
         runningProcesses.values.forEach { process ->
             try {
                 process.destroy()
             } catch (e: Exception) {
-                process.destroyForcibly()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    process.destroyForcibly()
+                } else {
+                    process.destroy()
+                }
             }
         }
         runningProcesses.clear()
