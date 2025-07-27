@@ -15,8 +15,8 @@ fun MainScreen() {
     var selectedTab by remember { mutableIntStateOf(0) }
     
     val tabs = listOf(
-        TabItem(stringResource(R.string.frpc_tab), Icons.Default.DeviceHub),
-        TabItem(stringResource(R.string.frps_tab), Icons.Default.Dns),
+        TabItem(stringResource(R.string.frpc_tab), Icons.Default.Computer),
+        TabItem(stringResource(R.string.frps_tab), Icons.Default.Storage),
         TabItem(stringResource(R.string.settings_tab), Icons.Default.Settings),
         TabItem(stringResource(R.string.about_tab), Icons.Default.Info)
     )

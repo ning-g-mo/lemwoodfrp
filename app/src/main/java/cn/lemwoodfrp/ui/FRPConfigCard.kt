@@ -42,7 +42,7 @@ fun FRPConfigCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = if (config.type == FRPType.CLIENT) Icons.Default.DeviceHub else Icons.Default.Dns,
+                        imageVector = if (config.type == FRPType.CLIENT) Icons.Default.Computer else Icons.Default.Storage,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary
                     )
