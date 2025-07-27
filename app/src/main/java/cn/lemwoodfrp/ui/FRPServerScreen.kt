@@ -1,5 +1,6 @@
 package cn.lemwoodfrp.ui
 
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import cn.lemwoodfrp.R
 import cn.lemwoodfrp.model.FRPConfig
 import cn.lemwoodfrp.model.FRPType
+import cn.lemwoodfrp.service.FRPService
 import cn.lemwoodfrp.utils.ConfigManager
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,7 +94,19 @@ fun FRPServerScreen() {
                             ConfigManager.deleteConfig(context, config.id)
                             configs = ConfigManager.getAllConfigs(context).filter { it.type == FRPType.SERVER }
                         },
-                        onToggle = { /* TODO: 实现启动/停止功能 */ }
+                        onToggle = { 
+                            // 启动/停止FRP进程 qwq
+                            val intent = Intent(context, FRPService::class.java).apply {
+                                action = if (config.isRunning) "stop_frp" else "start_frp"
+                                putExtra("config_id", config.id)
+                            }
+                            context.startService(intent)
+                            
+                            // 更新本地状态 AWA
+                            val updatedConfig = config.copy(isRunning = !config.isRunning)
+                            ConfigManager.updateConfig(context, updatedConfig)
+                            configs = ConfigManager.getAllConfigs(context).filter { it.type == FRPType.SERVER }
+                        }
                     )
                 }
             }
