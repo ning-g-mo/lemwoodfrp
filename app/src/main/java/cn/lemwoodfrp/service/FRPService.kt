@@ -80,6 +80,10 @@ class FRPService : Service() {
             LogManager.d(TAG, "系统架构信息: ${Build.SUPPORTED_ABIS.joinToString()}")
             LogManager.d(TAG, "应用私有目录: ${filesDir.absolutePath}")
             
+            // 检测设备架构 qwq
+            val deviceAbi = getDeviceAbi()
+            LogManager.i(TAG, "检测到设备架构: $deviceAbi")
+            
             val frpDir = File(filesDir, "frp")
             LogManager.d(TAG, "FRP目录路径: ${frpDir.absolutePath}")
             
@@ -123,7 +127,9 @@ class FRPService : Service() {
             
             if (!frpcFile.exists()) {
                 LogManager.d(TAG, "从assets复制frpc文件...")
-                copyAssetToFile("frp/frpc", frpcFile)
+                val frpcAssetPath = "frp/$deviceAbi/frpc"
+                LogManager.d(TAG, "frpc资源路径: $frpcAssetPath")
+                copyAssetToFile(frpcAssetPath, frpcFile)
                 LogManager.d(TAG, "frpc复制完成，文件大小: ${frpcFile.length()} bytes")
             }
             
@@ -152,7 +158,9 @@ class FRPService : Service() {
             
             if (!frpsFile.exists()) {
                 LogManager.d(TAG, "从assets复制frps文件...")
-                copyAssetToFile("frp/frps", frpsFile)
+                val frpsAssetPath = "frp/$deviceAbi/frps"
+                LogManager.d(TAG, "frps资源路径: $frpsAssetPath")
+                copyAssetToFile(frpsAssetPath, frpsFile)
                 LogManager.d(TAG, "frps复制完成，文件大小: ${frpsFile.length()} bytes")
             }
             
@@ -972,6 +980,29 @@ class FRPService : Service() {
         LogManager.saveLogsToFile(this)
         LogManager.i(TAG, "FRP服务已关闭 qwq")
     }
+    
+    /**
+     * 获取设备架构 qwq
+     * 根据设备支持的ABI返回对应的架构字符串
+     */
+    private fun getDeviceAbi(): String {
+        // 按优先级检查支持的架构
+        for (abi in Build.SUPPORTED_ABIS) {
+            when (abi) {
+                "arm64-v8a" -> return "arm64-v8a"
+                "armeabi-v7a" -> return "armeabi-v7a"
+                "armeabi" -> return "armeabi-v7a" // 向下兼容
+                "x86_64" -> return "arm64-v8a" // 使用arm64作为fallback
+                "x86" -> return "armeabi-v7a" // 使用arm32作为fallback
+            }
+        }
+        
+        // 如果没有匹配的架构，默认使用arm64-v8a AWA
+        LogManager.w(TAG, "未找到匹配的架构，使用默认架构: arm64-v8a")
+        LogManager.w(TAG, "设备支持的架构: ${Build.SUPPORTED_ABIS.joinToString()}")
+        return "arm64-v8a"
+    }
+    
     /**
      * 诊断FRP环境 qwq
      * 用于排查启动问题
