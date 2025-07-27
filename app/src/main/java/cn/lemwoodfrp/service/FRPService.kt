@@ -104,7 +104,7 @@ class FRPService : Service() {
                     chmodProcess.waitFor()
                     LogManager.d(TAG, "chmod frpc 执行完成")
                 } catch (e: Exception) {
-                    LogManager.w(TAG, "chmod frpc 失败", e)
+                    LogManager.w(TAG, "chmod frpc 失败: ${e.message}")
                 }
             }
             
@@ -118,7 +118,7 @@ class FRPService : Service() {
                     chmodProcess.waitFor()
                     LogManager.d(TAG, "chmod frps 执行完成")
                 } catch (e: Exception) {
-                    LogManager.w(TAG, "chmod frps 失败", e)
+                    LogManager.w(TAG, "chmod frps 失败: ${e.message}")
                 }
             }
             
