@@ -145,7 +145,7 @@ fun AboutScreen() {
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(
-                                    Icons.Default.Download,
+                                    Icons.Default.GetApp,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
