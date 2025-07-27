@@ -20,6 +20,9 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      
     - name: Cache Gradle packages
       uses: actions/cache@v3
       with:
@@ -51,6 +54,9 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
         
     - name: Cache Gradle packages
       uses: actions/cache@v3
@@ -87,6 +93,9 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
         
     - name: Cache Gradle packages
       uses: actions/cache@v3
