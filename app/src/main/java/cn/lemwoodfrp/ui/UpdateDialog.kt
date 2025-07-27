@@ -121,7 +121,7 @@ fun UpdateDialog(
                                     onClick = { uriHandler.openUri(asset.downloadUrl) }
                                 ) {
                                     Icon(
-                                        Icons.Default.FileDownload,
+                                        Icons.Default.GetApp,
                                         contentDescription = stringResource(R.string.download),
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
