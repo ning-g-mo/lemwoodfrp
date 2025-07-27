@@ -15,6 +15,7 @@ data class FRPConfig(
     val localPort: Int? = null,
     val remotePort: Int? = null,
     val protocol: String = "tcp",
+    val proxyType: String = "tcp", // 代理类型 qwq
     val isEnabled: Boolean = true,
     val autoStart: Boolean = false,
     val isRunning: Boolean = false

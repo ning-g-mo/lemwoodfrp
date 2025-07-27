@@ -12,9 +12,13 @@ import cn.lemwoodfrp.LemwoodFRPApplication
 import cn.lemwoodfrp.R
 import cn.lemwoodfrp.model.FRPConfig
 import cn.lemwoodfrp.model.FRPStatus
+import cn.lemwoodfrp.model.FRPType
 import cn.lemwoodfrp.ui.MainActivity
+import cn.lemwoodfrp.utils.ConfigManager
 import kotlinx.coroutines.*
 import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 
 class FRPService : Service() {
@@ -39,6 +43,8 @@ class FRPService : Service() {
     
     override fun onCreate() {
         super.onCreate()
+        // 初始化FRP二进制文件 qwq
+        initializeFRPBinaries()
         startForeground(NOTIFICATION_ID, createNotification())
     }
     
@@ -54,6 +60,59 @@ class FRPService : Service() {
             }
         }
         return START_STICKY
+    }
+    
+    /**
+     * 初始化FRP二进制文件 AWA
+     * 从assets复制到应用私有目录并设置可执行权限
+     */
+    private fun initializeFRPBinaries() {
+        try {
+            val frpDir = File(filesDir, "frp")
+            if (!frpDir.exists()) {
+                frpDir.mkdirs()
+            }
+            
+            // 复制frpc和frps二进制文件
+            copyAssetToFile("frp/frpc", File(frpDir, "frpc"))
+            copyAssetToFile("frp/frps", File(frpDir, "frps"))
+            
+            // 设置可执行权限 喵～
+            File(frpDir, "frpc").setExecutable(true)
+            File(frpDir, "frps").setExecutable(true)
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    /**
+     * 从assets复制文件到目标位置
+     */
+    private fun copyAssetToFile(assetPath: String, targetFile: File) {
+        if (targetFile.exists()) {
+            return // 文件已存在，跳过复制
+        }
+        
+        var inputStream: InputStream? = null
+        var outputStream: FileOutputStream? = null
+        
+        try {
+            inputStream = assets.open(assetPath)
+            outputStream = FileOutputStream(targetFile)
+            
+            val buffer = ByteArray(1024)
+            var length: Int
+            while (inputStream.read(buffer).also { length = it } > 0) {
+                outputStream.write(buffer, 0, length)
+            }
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            inputStream?.close()
+            outputStream?.close()
+        }
     }
     
     private fun createNotification(): Notification {
@@ -86,7 +145,7 @@ class FRPService : Service() {
                 val command = buildFRPCommand(config, configFile)
                 
                 val processBuilder = ProcessBuilder(command)
-                processBuilder.directory(getExternalFilesDir("frp"))
+                processBuilder.directory(File(filesDir, "frp"))
                 
                 val process = processBuilder.start()
                 runningProcesses[configId] = process
@@ -180,26 +239,63 @@ class FRPService : Service() {
     }
     
     private fun getConfigById(configId: String): FRPConfig? {
-        // 这里需要从ConfigManager获取配置
-        // 为了简化，暂时返回null，实际实现时需要注入Context
-        return null
+        // 从ConfigManager获取配置 AWA
+        return ConfigManager.getAllConfigs(this).find { it.id == configId }
     }
     
     private fun createConfigFile(config: FRPConfig): File {
-        // 创建FRP配置文件的逻辑
-        val configDir = File(getExternalFilesDir("frp"), "configs")
+        val configDir = File(filesDir, "frp/configs")
         if (!configDir.exists()) {
             configDir.mkdirs()
         }
         
-        val configFile = File(configDir, "${config.id}.ini")
-        // 这里需要根据config生成FRP配置文件内容
+        val configFile = File(configDir, "${config.id}.toml")
+        
+        // 根据配置类型生成TOML配置文件内容 喵～
+        val configContent = when (config.type) {
+            FRPType.CLIENT -> generateClientConfig(config)
+            FRPType.SERVER -> generateServerConfig(config)
+        }
+        
+        configFile.writeText(configContent)
         return configFile
     }
     
+    /**
+     * 生成客户端配置文件内容
+     */
+    private fun generateClientConfig(config: FRPConfig): String {
+        return """
+            serverAddr = "${config.serverAddr}"
+            serverPort = ${config.serverPort}
+            
+            [[proxies]]
+            name = "${config.name}"
+            type = "${config.proxyType}"
+            localIP = "${config.localIP}"
+            localPort = ${config.localPort}
+            remotePort = ${config.remotePort}
+        """.trimIndent()
+    }
+    
+    /**
+     * 生成服务端配置文件内容
+     */
+    private fun generateServerConfig(config: FRPConfig): String {
+        return """
+            bindPort = ${config.serverPort}
+            
+            # 可选配置 qwq
+            # dashboardAddr = "0.0.0.0"
+            # dashboardPort = 7500
+            # dashboardUser = "admin"
+            # dashboardPwd = "admin"
+        """.trimIndent()
+    }
+    
     private fun buildFRPCommand(config: FRPConfig, configFile: File): List<String> {
-        val frpDir = getExternalFilesDir("frp")
-        val executable = if (config.type.name == "CLIENT") "frpc" else "frps"
+        val frpDir = File(filesDir, "frp")
+        val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
         
         return listOf(
             File(frpDir, executable).absolutePath,

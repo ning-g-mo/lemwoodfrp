@@ -26,6 +26,7 @@ fun AddConfigDialog(
     var localPort by remember { mutableStateOf("") }
     var remotePort by remember { mutableStateOf("") }
     var protocol by remember { mutableStateOf("tcp") }
+    var proxyType by remember { mutableStateOf("tcp") } // 新增代理类型字段 qwq
     var autoStart by remember { mutableStateOf(false) }
     
     AlertDialog(
@@ -87,6 +88,40 @@ fun AddConfigDialog(
                         singleLine = true
                     )
                     
+                    // 代理类型选择 AWA
+                    var expanded by remember { mutableStateOf(false) }
+                    val proxyTypes = listOf("tcp", "udp", "http", "https", "stcp", "sudp", "xtcp")
+                    
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = !expanded }
+                    ) {
+                        OutlinedTextField(
+                            value = proxyType,
+                            onValueChange = { },
+                            readOnly = true,
+                            label = { Text("代理类型") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            proxyTypes.forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text(type) },
+                                    onClick = {
+                                        proxyType = type
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    
                     OutlinedTextField(
                         value = protocol,
                         onValueChange = { protocol = it },
@@ -120,9 +155,11 @@ fun AddConfigDialog(
                         type = type,
                         serverAddr = serverAddr,
                         serverPort = serverPort.toIntOrNull() ?: 0,
+                        localIP = "127.0.0.1", // 默认本地IP qwq
                         localPort = localPort.toIntOrNull() ?: 0,
                         remotePort = remotePort.toIntOrNull() ?: 0,
                         protocol = protocol,
+                        proxyType = proxyType, // 添加代理类型 喵～
                         autoStart = autoStart
                     )
                     onConfirm(config)
