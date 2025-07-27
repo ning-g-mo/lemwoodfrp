@@ -89,14 +89,14 @@ fun FRPConfigCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (config.localPort > 0) {
+                    if ((config.localPort ?: 0) > 0) {
                         Text(
                             text = "${stringResource(R.string.local_port)}: ${config.localPort}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    if (config.remotePort > 0) {
+                    if ((config.remotePort ?: 0) > 0) {
                         Text(
                             text = "${stringResource(R.string.remote_port)}: ${config.remotePort}",
                             style = MaterialTheme.typography.bodyMedium,

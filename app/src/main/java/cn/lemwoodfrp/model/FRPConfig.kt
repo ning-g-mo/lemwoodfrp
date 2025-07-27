@@ -16,7 +16,8 @@ data class FRPConfig(
     val remotePort: Int? = null,
     val protocol: String = "tcp",
     val isEnabled: Boolean = true,
-    val autoStart: Boolean = false
+    val autoStart: Boolean = false,
+    val isRunning: Boolean = false
 ) : Parcelable
 
 enum class FRPType {
