@@ -93,16 +93,33 @@ class FRPService : Service() {
             val frpcFile = File(frpDir, "frpc")
             val frpsFile = File(frpDir, "frps")
             
+            // 尝试使用Java API设置权限
             if (frpcFile.setExecutable(true)) {
                 LogManager.s(TAG, "frpc可执行权限设置成功")
             } else {
-                LogManager.w(TAG, "frpc可执行权限设置失败")
+                LogManager.w(TAG, "frpc可执行权限设置失败，尝试使用chmod")
+                // 尝试使用chmod命令设置权限 qwq
+                try {
+                    val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${frpcFile.absolutePath}")
+                    chmodProcess.waitFor()
+                    LogManager.d(TAG, "chmod frpc 执行完成")
+                } catch (e: Exception) {
+                    LogManager.w(TAG, "chmod frpc 失败", e)
+                }
             }
             
             if (frpsFile.setExecutable(true)) {
                 LogManager.s(TAG, "frps可执行权限设置成功")
             } else {
-                LogManager.w(TAG, "frps可执行权限设置失败")
+                LogManager.w(TAG, "frps可执行权限设置失败，尝试使用chmod")
+                // 尝试使用chmod命令设置权限 AWA
+                try {
+                    val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${frpsFile.absolutePath}")
+                    chmodProcess.waitFor()
+                    LogManager.d(TAG, "chmod frps 执行完成")
+                } catch (e: Exception) {
+                    LogManager.w(TAG, "chmod frps 失败", e)
+                }
             }
             
             LogManager.s(TAG, "FRP二进制文件初始化完成 AWA")
@@ -201,10 +218,24 @@ class FRPService : Service() {
                     LogManager.w(TAG, "文件没有执行权限，尝试设置权限", configId)
                     if (!executableFile.setExecutable(true)) {
                         LogManager.e(TAG, "设置执行权限失败", configId = configId)
-                        return@launch
+                        // 尝试使用chmod作为备用方案 qwq
+                        try {
+                            val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${executableFile.absolutePath}")
+                            val exitCode = chmodProcess.waitFor()
+                            LogManager.d(TAG, "chmod 退出码: $exitCode", configId)
+                            if (exitCode != 0) {
+                                LogManager.e(TAG, "chmod 执行失败", configId = configId)
+                                return@launch
+                            }
+                        } catch (e: Exception) {
+                            LogManager.e(TAG, "chmod 异常", e, configId)
+                            return@launch
+                        }
                     }
                 }
                 
+                // 再次检查权限 AWA
+                LogManager.d(TAG, "最终权限检查 - 可读: ${executableFile.canRead()}, 可执行: ${executableFile.canExecute()}", configId)
                 val configFile = createConfigFile(config)
                 val command = buildFRPCommand(config, configFile)
                 
@@ -213,6 +244,11 @@ class FRPService : Service() {
                 
                 val processBuilder = ProcessBuilder(command)
                 processBuilder.directory(File(filesDir, "frp"))
+                
+                // 设置环境变量，确保在Android环境下正确执行 qwq
+                val env = processBuilder.environment()
+                env["PATH"] = "${File(filesDir, "frp").absolutePath}:${env["PATH"] ?: ""}"
+                env["LD_LIBRARY_PATH"] = File(filesDir, "frp").absolutePath
                 
                 // 重定向错误输出到标准输出，便于日志记录
                 processBuilder.redirectErrorStream(true)
@@ -459,9 +495,11 @@ class FRPService : Service() {
     private fun buildFRPCommand(config: FRPConfig, configFile: File): List<String> {
         val frpDir = File(filesDir, "frp")
         val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
+        val executableFile = File(frpDir, executable)
         
+        // 在Android环境下，直接执行二进制文件 AWA
         return listOf(
-            File(frpDir, executable).absolutePath,
+            executableFile.absolutePath,
             "-c",
             configFile.absolutePath
         )
