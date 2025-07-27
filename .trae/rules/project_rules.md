@@ -65,3 +65,4 @@ lemwoodfrp/
 - 尽量使用mcp工具
 - 本地终端为PowerShell
 - GitHub ID为ning-g-mo 昵称是柠枺
+- 不要创建任务完成报告，尤其是md文件。
