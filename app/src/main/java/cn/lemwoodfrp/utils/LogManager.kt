@@ -53,12 +53,6 @@ object LogManager {
     fun init(context: Context) {
         loadLogsFromFile(context)
         i("LogManager", "日志管理器初始化完成 喵～")
-        
-        // 添加一些测试日志来验证功能 qwq
-        d("LogManager", "调试日志测试 AWA")
-        w("LogManager", "警告日志测试 qwq")
-        s("LogManager", "成功日志测试 ✨")
-        e("LogManager", "错误日志测试（这是测试，不是真的错误）喵～")
     }
     
     /**
