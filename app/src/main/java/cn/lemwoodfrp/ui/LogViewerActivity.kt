@@ -21,7 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cn.lemwoodfrp.manager.LogManager
+import cn.lemwoodfrp.utils.LogManager
 import cn.lemwoodfrp.ui.theme.LemwoodFRPTheme
 import kotlinx.coroutines.launch
 
@@ -40,13 +40,20 @@ class LogViewerActivity : ComponentActivity() {
     }
     
     private fun exportLogs() {
-        val logs = LogManager.exportLogs()
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, logs)
-            putExtra(Intent.EXTRA_SUBJECT, "LemwoodFRP 日志")
+        val logFile = LogManager.exportLogs(this)
+        if (logFile != null) {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_STREAM, androidx.core.content.FileProvider.getUriForFile(
+                    this@LogViewerActivity,
+                    "${packageName}.fileprovider",
+                    logFile
+                ))
+                putExtra(Intent.EXTRA_SUBJECT, "LemwoodFRP 日志")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "导出日志"))
         }
-        startActivity(Intent.createChooser(intent, "导出日志"))
     }
 }
 
@@ -56,6 +63,7 @@ fun LogViewerScreen(
     onBack: () -> Unit,
     onExportLogs: () -> Unit
 ) {
+    val context = LocalContext.current
     val logs by LogManager.logs.collectAsState()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -79,7 +87,7 @@ fun LogViewerScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { LogManager.clearLogs() }) {
+                    IconButton(onClick = { LogManager.clearLogs(context) }) {
                         Icon(Icons.Default.Clear, contentDescription = "清空日志")
                     }
                     IconButton(onClick = onExportLogs) {
@@ -156,7 +164,7 @@ fun LogEntryCard(logEntry: LogManager.LogEntry) {
                     fontFamily = FontFamily.Monospace
                 )
                 Text(
-                    text = logEntry.timestamp,
+                    text = logEntry.formattedTime,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace

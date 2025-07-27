@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- External files directory for log exports -->
+    <external-files-path name="log_exports" path="." />
+    <!-- Internal files directory for log storage -->
+    <files-path name="log_files" path="." />
+</paths>
