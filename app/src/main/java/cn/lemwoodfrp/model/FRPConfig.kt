@@ -16,6 +16,8 @@ data class FRPConfig(
     val remotePort: Int? = null,
     val protocol: String = "tcp",
     val proxyType: String = "tcp", // 代理类型 qwq
+    val customDomain: String = "", // 自定义域名 AWA
+    val subdomain: String = "", // 子域名 喵～
     val isEnabled: Boolean = true,
     val autoStart: Boolean = false,
     val isRunning: Boolean = false
