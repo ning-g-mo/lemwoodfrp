@@ -29,7 +29,7 @@ jobs:
         ndk: 25.1.8937393
         
     - name: Cache Gradle packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.gradle/caches
@@ -69,7 +69,7 @@ jobs:
         ndk: 25.1.8937393
         
     - name: Cache Gradle packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.gradle/caches
@@ -85,7 +85,7 @@ jobs:
       run: ./gradlew assembleDebug
       
     - name: Upload debug APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: debug-apk
         path: app/build/outputs/apk/debug/*.apk
@@ -113,7 +113,7 @@ jobs:
         ndk: 25.1.8937393
         
     - name: Cache Gradle packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.gradle/caches
@@ -141,22 +141,12 @@ jobs:
         BUILD_TOOLS_VERSION: "34.0.0"
         
     - name: Create Release
-      uses: actions/create-release@v1
-      id: create_release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref }}
-        release_name: LemwoodFRP ${{ github.ref }}
+        files: ${{ steps.sign_app.outputs.signedReleaseFile }}
+        name: LemwoodFRP ${{ github.ref_name }}
         draft: false
         prerelease: false
-        
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.sign_app.outputs.signedReleaseFile }}
-        asset_name: LemwoodFRP-${{ github.ref_name }}.apk
-        asset_content_type: application/vnd.android.package-archive
