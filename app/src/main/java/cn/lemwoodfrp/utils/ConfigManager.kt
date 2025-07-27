@@ -95,4 +95,14 @@ object ConfigManager {
     fun setLastVersionCheckTime(context: Context, time: Long) {
         getPrefs(context).edit().putLong(KEY_LAST_VERSION_CHECK, time).apply()
     }
+    
+    // 添加方法别名以匹配代码中使用的方法名
+    fun getAllConfigs(context: Context): List<FRPConfig> = getConfigs(context)
+    fun getAutoStart(context: Context): Boolean = isAutoStartEnabled(context)
+    fun setAutoStart(context: Context, enabled: Boolean) = setAutoStartEnabled(context, enabled)
+    
+    // 初始化方法
+    fun init(context: Context) {
+        // 初始化逻辑，如果需要的话
+    }
 }

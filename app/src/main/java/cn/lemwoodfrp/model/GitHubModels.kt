@@ -1,17 +1,23 @@
 package cn.lemwoodfrp.model
 
+import com.google.gson.annotations.SerializedName
+
 data class GitHubRelease(
-    val tag_name: String,
+    @SerializedName("tag_name")
+    val tagName: String,
     val name: String,
     val body: String,
-    val published_at: String,
-    val html_url: String,
+    @SerializedName("published_at")
+    val publishedAt: String,
+    @SerializedName("html_url")
+    val htmlUrl: String,
     val assets: List<GitHubAsset>
 )
 
 data class GitHubAsset(
     val name: String,
-    val browser_download_url: String,
+    @SerializedName("browser_download_url")
+    val downloadUrl: String,
     val size: Long
 )
 

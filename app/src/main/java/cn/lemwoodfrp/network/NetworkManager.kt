@@ -29,5 +29,6 @@ object NetworkManager {
         .build()
     
     val gitHubApi: GitHubApiService = retrofit.create(GitHubApiService::class.java)
+    val gitHubApiService: GitHubApiService = gitHubApi // 别名以匹配代码中使用的名称
     val gson: Gson = Gson()
 }
