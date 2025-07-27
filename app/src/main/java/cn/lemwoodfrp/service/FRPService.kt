@@ -178,15 +178,38 @@ class FRPService : Service() {
                     return@launch
                 }
                 
+                LogManager.d(TAG, "找到配置: ${config.name}, 类型: ${config.type}", configId)
+                
                 if (runningProcesses.containsKey(configId)) {
                     LogManager.w(TAG, "进程已在运行中", configId)
                     return@launch // 已经在运行
+                }
+                
+                // 检查二进制文件是否存在 qwq
+                val frpDir = File(filesDir, "frp")
+                val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
+                val executableFile = File(frpDir, executable)
+                
+                LogManager.d(TAG, "检查可执行文件: ${executableFile.absolutePath}", configId)
+                
+                if (!executableFile.exists()) {
+                    LogManager.e(TAG, "可执行文件不存在: ${executableFile.absolutePath}", configId = configId)
+                    return@launch
+                }
+                
+                if (!executableFile.canExecute()) {
+                    LogManager.w(TAG, "文件没有执行权限，尝试设置权限", configId)
+                    if (!executableFile.setExecutable(true)) {
+                        LogManager.e(TAG, "设置执行权限失败", configId = configId)
+                        return@launch
+                    }
                 }
                 
                 val configFile = createConfigFile(config)
                 val command = buildFRPCommand(config, configFile)
                 
                 LogManager.d(TAG, "执行命令: ${command.joinToString(" ")}", configId)
+                LogManager.d(TAG, "工作目录: ${File(filesDir, "frp").absolutePath}", configId)
                 
                 val processBuilder = ProcessBuilder(command)
                 processBuilder.directory(File(filesDir, "frp"))
@@ -194,6 +217,7 @@ class FRPService : Service() {
                 // 重定向错误输出到标准输出，便于日志记录
                 processBuilder.redirectErrorStream(true)
                 
+                LogManager.d(TAG, "开始启动进程...", configId)
                 val process = processBuilder.start()
                 runningProcesses[configId] = process
                 
@@ -277,14 +301,22 @@ class FRPService : Service() {
      * 监控进程状态和输出
      */
     private fun monitorProcess(configId: String, process: Process) {
+        LogManager.d(TAG, "开始监控进程输出", configId)
+        
         // 监控进程输出
         serviceScope.launch {
             try {
                 val reader = BufferedReader(InputStreamReader(process.inputStream))
                 var line: String?
+                var lineCount = 0
+                
+                LogManager.d(TAG, "开始读取进程输出流", configId)
                 
                 while (reader.readLine().also { line = it } != null) {
                     line?.let { output ->
+                        lineCount++
+                        LogManager.d(TAG, "读取到输出行 #$lineCount: $output", configId)
+                        
                         // 根据输出内容判断是否为错误信息
                         val isError = output.contains("error", ignoreCase = true) || 
                                      output.contains("failed", ignoreCase = true) ||
@@ -293,6 +325,9 @@ class FRPService : Service() {
                         LogManager.logFRPProcess(configId, output, isError)
                     }
                 }
+                
+                LogManager.d(TAG, "进程输出流结束，共读取 $lineCount 行", configId)
+                
             } catch (e: Exception) {
                 LogManager.e(TAG, "读取进程输出失败", e, configId)
             }
@@ -301,6 +336,7 @@ class FRPService : Service() {
         // 监控进程退出
         serviceScope.launch {
             try {
+                LogManager.d(TAG, "开始等待进程退出", configId)
                 val exitCode = process.waitFor()
                 runningProcesses.remove(configId)
                 
@@ -338,6 +374,7 @@ class FRPService : Service() {
         val configDir = File(filesDir, "frp/configs")
         if (!configDir.exists()) {
             configDir.mkdirs()
+            LogManager.d(TAG, "创建配置目录: ${configDir.absolutePath}", config.id)
         }
         
         val configFile = File(configDir, "${config.id}.toml")
@@ -347,6 +384,8 @@ class FRPService : Service() {
             FRPType.CLIENT -> generateClientConfig(config)
             FRPType.SERVER -> generateServerConfig(config)
         }
+        
+        LogManager.d(TAG, "生成的配置文件内容:\n$configContent", config.id)
         
         configFile.writeText(configContent)
         LogManager.d(TAG, "配置文件已生成: ${configFile.absolutePath}", config.id)
