@@ -829,7 +829,20 @@ class FRPService : Service() {
             if (runningProcesses.isNotEmpty()) {
                 runningProcesses.forEach { (configId, process) ->
                     diagnosis.appendLine("  配置ID: $configId")
-                    diagnosis.appendLine("  进程存活: ${process.isAlive}")
+                    // API兼容性处理：Process.isAlive需要API 26 AWA
+                    diagnosis.appendLine("  进程存活: " + 
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
+                            process.isAlive 
+                        } else { 
+                            // API 25及以下的fallback方案 qwq
+                            try { 
+                                process.exitValue() 
+                                false // 进程已退出
+                            } catch (e: IllegalThreadStateException) { 
+                                true // 进程仍在运行
+                            } 
+                        }
+                    )
                     try {
                         diagnosis.appendLine("  进程PID: ${getPid(process)}")
                     } catch (e: Exception) {
