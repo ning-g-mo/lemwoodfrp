@@ -10,7 +10,9 @@
     
     <!-- FRP管理 -->
     <string name="frpc_title">FRP客户端</string>
+    <string name="frps_title">FRP服务端</string>
     <string name="no_frpc_configs">暂无客户端配置</string>
+    <string name="no_frps_configs">暂无服务端配置</string>
     <string name="start_service">启动服务</string>
     <string name="stop_service">停止服务</string>
     <string name="service_running">服务运行中</string>
