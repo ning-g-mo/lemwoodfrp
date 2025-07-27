@@ -1,0 +1,59 @@
+<resources>
+    <string name="app_name">柠枺frp</string>
+    
+    <!-- 主界面 -->
+    <string name="main_title">柠枺frp</string>
+    <string name="frpc_tab">客户端</string>
+    <string name="frps_tab">服务端</string>
+    <string name="settings_tab">设置</string>
+    <string name="about_tab">关于</string>
+    
+    <!-- FRP管理 -->
+    <string name="start_service">启动服务</string>
+    <string name="stop_service">停止服务</string>
+    <string name="service_running">服务运行中</string>
+    <string name="service_stopped">服务已停止</string>
+    <string name="add_config">添加配置</string>
+    <string name="edit_config">编辑配置</string>
+    <string name="delete_config">删除配置</string>
+    
+    <!-- 配置管理 -->
+    <string name="config_name">配置名称</string>
+    <string name="server_addr">服务器地址</string>
+    <string name="server_port">服务器端口</string>
+    <string name="token">认证令牌</string>
+    <string name="local_ip">本地IP</string>
+    <string name="local_port">本地端口</string>
+    <string name="remote_port">远程端口</string>
+    <string name="protocol_type">协议类型</string>
+    
+    <!-- 设置 -->
+    <string name="auto_start">开机自启</string>
+    <string name="battery_optimization">电池优化</string>
+    <string name="check_update">检查更新</string>
+    <string name="announcement">公告</string>
+    
+    <!-- 通知 -->
+    <string name="notification_channel_name">FRP服务</string>
+    <string name="notification_channel_desc">FRP服务运行状态通知</string>
+    <string name="notification_title">FRP服务运行中</string>
+    <string name="notification_content">点击查看详情</string>
+    
+    <!-- 错误信息 -->
+    <string name="error_network">网络连接失败</string>
+    <string name="error_config">配置文件错误</string>
+    <string name="error_permission">权限不足</string>
+    <string name="error_unknown">未知错误</string>
+    
+    <!-- 对话框 -->
+    <string name="dialog_confirm">确认</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="dialog_delete_title">删除确认</string>
+    <string name="dialog_delete_message">确定要删除这个配置吗？</string>
+    
+    <!-- 关于 -->
+    <string name="version">版本</string>
+    <string name="github_repo">GitHub仓库</string>
+    <string name="developer">开发者</string>
+    <string name="license">开源协议</string>
+</resources>
