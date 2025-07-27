@@ -23,6 +23,7 @@ fun FRPServerScreen() {
     val context = LocalContext.current
     var configs by remember { mutableStateOf(emptyList<FRPConfig>()) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingConfig by remember { mutableStateOf<FRPConfig?>(null) } // 编辑状态 喵～
     
     LaunchedEffect(Unit) {
         configs = ConfigManager.getAllConfigs(context).filter { it.type == FRPType.SERVER }
@@ -86,7 +87,7 @@ fun FRPServerScreen() {
                 items(configs) { config ->
                     FRPConfigCard(
                         config = config,
-                        onEdit = { /* TODO: 实现编辑功能 */ },
+                        onEdit = { editingConfig = config }, // 设置编辑状态 AWA
                         onDelete = { 
                             ConfigManager.deleteConfig(context, config.id)
                             configs = ConfigManager.getAllConfigs(context).filter { it.type == FRPType.SERVER }
@@ -106,6 +107,19 @@ fun FRPServerScreen() {
                 ConfigManager.addConfig(context, config)
                 configs = ConfigManager.getAllConfigs(context).filter { it.type == FRPType.SERVER }
                 showAddDialog = false
+            }
+        )
+    }
+    
+    // 编辑对话框 qwq
+    editingConfig?.let { config ->
+        EditConfigDialog(
+            config = config,
+            onDismiss = { editingConfig = null },
+            onConfirm = { updatedConfig ->
+                ConfigManager.updateConfig(context, updatedConfig)
+                configs = ConfigManager.getAllConfigs(context).filter { it.type == FRPType.SERVER }
+                editingConfig = null
             }
         )
     }

@@ -37,9 +37,12 @@
     <string name="protocol_type">协议类型</string>
     <string name="add_frpc_config">添加客户端配置</string>
     <string name="add_frps_config">添加服务端配置</string>
+    <string name="edit_frpc_config">编辑客户端配置</string>
+    <string name="edit_frps_config">编辑服务端配置</string>
     <string name="server_address">服务器地址</string>
     <string name="protocol">协议</string>
     <string name="add">添加</string>
+    <string name="save">保存</string>
     <string name="cancel">取消</string>
     
     <!-- 设置 -->
