@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import cn.lemwoodfrp.utils.ConfigManager
+import cn.lemwoodfrp.utils.LogManager
 
 /**
  * 柠枺frp应用程序类
@@ -22,6 +23,9 @@ class LemwoodFRPApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        
+        // 初始化日志管理器 qwq
+        LogManager.init(this)
         
         // 初始化配置管理器
         ConfigManager.init(this)

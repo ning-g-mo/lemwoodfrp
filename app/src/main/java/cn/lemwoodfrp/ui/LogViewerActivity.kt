@@ -72,7 +72,8 @@ fun LogViewerScreen(
     LaunchedEffect(logs.size) {
         if (logs.isNotEmpty()) {
             coroutineScope.launch {
-                listState.animateScrollToItem(logs.size - 1)
+                // 滚动到第一个元素（最新日志在开头）
+                listState.animateScrollToItem(0)
             }
         }
     }
