@@ -66,7 +66,7 @@ fun FRPClientScreen() {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Icon(
-                        Icons.Default.Computer,
+                        Icons.Default.DeviceHub,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant

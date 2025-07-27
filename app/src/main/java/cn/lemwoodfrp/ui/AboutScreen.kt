@@ -64,7 +64,7 @@ fun AboutScreen() {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Icon(
-                        Icons.Default.PhoneAndroid,
+                        Icons.Default.Phone,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -145,7 +145,7 @@ fun AboutScreen() {
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(
-                                    Icons.Default.Download,
+                                    Icons.Default.GetApp,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
