@@ -54,7 +54,7 @@ object BatteryOptimizationUtils {
     /**
      * 打开应用详情设置页面
      */
-    private fun openAppDetailsSettings(context: Context) {
+    fun openAppDetailsSettings(context: Context) {
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.parse("package:${context.packageName}")
         }

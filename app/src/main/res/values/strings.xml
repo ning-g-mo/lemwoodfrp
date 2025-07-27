@@ -86,4 +86,8 @@
     <string name="auto_start_desc">开机自动启动应用</string>
     <string name="battery_optimization_enabled">已启用电池优化</string>
     <string name="battery_optimization_disabled">已禁用电池优化</string>
+    <string name="battery_optimization_desc">禁用电池优化以确保应用在后台正常运行</string>
+    <string name="disable_optimization">禁用优化</string>
+    <string name="app_management">应用管理</string>
+    <string name="app_settings">应用设置</string>
 </resources>
