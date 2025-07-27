@@ -15,10 +15,9 @@ import cn.lemwoodfrp.model.FRPStatus
 import cn.lemwoodfrp.model.FRPType
 import cn.lemwoodfrp.ui.MainActivity
 import cn.lemwoodfrp.utils.ConfigManager
+import cn.lemwoodfrp.utils.LogManager
 import kotlinx.coroutines.*
-import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStream
+import java.io.*
 import java.util.concurrent.ConcurrentHashMap
 
 class FRPService : Service() {
@@ -33,6 +32,7 @@ class FRPService : Service() {
         private const val ACTION_START_FRP = "start_frp"
         private const val ACTION_STOP_FRP = "stop_frp"
         private const val EXTRA_CONFIG_ID = "config_id"
+        private const val TAG = "FRPService"
     }
     
     inner class FRPBinder : Binder() {
@@ -43,6 +43,9 @@ class FRPService : Service() {
     
     override fun onCreate() {
         super.onCreate()
+        LogManager.init(this)
+        LogManager.i(TAG, "FRP服务启动 qwq")
+        
         // 初始化FRP二进制文件 qwq
         initializeFRPBinaries()
         startForeground(NOTIFICATION_ID, createNotification())
@@ -52,11 +55,17 @@ class FRPService : Service() {
         when (intent?.action) {
             ACTION_START_FRP -> {
                 val configId = intent.getStringExtra(EXTRA_CONFIG_ID)
-                configId?.let { startFRPProcess(it) }
+                configId?.let { 
+                    LogManager.i(TAG, "收到启动FRP请求: $it")
+                    startFRPProcess(it) 
+                }
             }
             ACTION_STOP_FRP -> {
                 val configId = intent.getStringExtra(EXTRA_CONFIG_ID)
-                configId?.let { stopFRPProcess(it) }
+                configId?.let { 
+                    LogManager.i(TAG, "收到停止FRP请求: $it")
+                    stopFRPProcess(it) 
+                }
             }
         }
         return START_STICKY
@@ -68,9 +77,12 @@ class FRPService : Service() {
      */
     private fun initializeFRPBinaries() {
         try {
+            LogManager.i(TAG, "开始初始化FRP二进制文件...")
+            
             val frpDir = File(filesDir, "frp")
             if (!frpDir.exists()) {
                 frpDir.mkdirs()
+                LogManager.d(TAG, "创建FRP目录: ${frpDir.absolutePath}")
             }
             
             // 复制frpc和frps二进制文件
@@ -78,11 +90,25 @@ class FRPService : Service() {
             copyAssetToFile("frp/frps", File(frpDir, "frps"))
             
             // 设置可执行权限 喵～
-            File(frpDir, "frpc").setExecutable(true)
-            File(frpDir, "frps").setExecutable(true)
+            val frpcFile = File(frpDir, "frpc")
+            val frpsFile = File(frpDir, "frps")
+            
+            if (frpcFile.setExecutable(true)) {
+                LogManager.s(TAG, "frpc可执行权限设置成功")
+            } else {
+                LogManager.w(TAG, "frpc可执行权限设置失败")
+            }
+            
+            if (frpsFile.setExecutable(true)) {
+                LogManager.s(TAG, "frps可执行权限设置成功")
+            } else {
+                LogManager.w(TAG, "frps可执行权限设置失败")
+            }
+            
+            LogManager.s(TAG, "FRP二进制文件初始化完成 AWA")
             
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogManager.e(TAG, "初始化FRP二进制文件失败", e)
         }
     }
     
@@ -91,6 +117,7 @@ class FRPService : Service() {
      */
     private fun copyAssetToFile(assetPath: String, targetFile: File) {
         if (targetFile.exists()) {
+            LogManager.d(TAG, "文件已存在，跳过复制: ${targetFile.name}")
             return // 文件已存在，跳过复制
         }
         
@@ -98,17 +125,24 @@ class FRPService : Service() {
         var outputStream: FileOutputStream? = null
         
         try {
+            LogManager.d(TAG, "开始复制文件: $assetPath -> ${targetFile.absolutePath}")
+            
             inputStream = assets.open(assetPath)
             outputStream = FileOutputStream(targetFile)
             
             val buffer = ByteArray(1024)
             var length: Int
+            var totalBytes = 0
+            
             while (inputStream.read(buffer).also { length = it } > 0) {
                 outputStream.write(buffer, 0, length)
+                totalBytes += length
             }
             
+            LogManager.s(TAG, "文件复制成功: ${targetFile.name} (${totalBytes} bytes)")
+            
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogManager.e(TAG, "复制文件失败: $assetPath", e)
         } finally {
             inputStream?.close()
             outputStream?.close()
@@ -128,24 +162,37 @@ class FRPService : Service() {
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
-    }    
+    }
+    
     /**
      * 启动FRP进程
      */
     fun startFRPProcess(configId: String) {
         serviceScope.launch {
             try {
-                val config = getConfigById(configId) ?: return@launch
+                LogManager.i(TAG, "开始启动FRP进程", configId)
+                
+                val config = getConfigById(configId)
+                if (config == null) {
+                    LogManager.e(TAG, "配置不存在: $configId", configId = configId)
+                    return@launch
+                }
                 
                 if (runningProcesses.containsKey(configId)) {
+                    LogManager.w(TAG, "进程已在运行中", configId)
                     return@launch // 已经在运行
                 }
                 
                 val configFile = createConfigFile(config)
                 val command = buildFRPCommand(config, configFile)
                 
+                LogManager.d(TAG, "执行命令: ${command.joinToString(" ")}", configId)
+                
                 val processBuilder = ProcessBuilder(command)
                 processBuilder.directory(File(filesDir, "frp"))
+                
+                // 重定向错误输出到标准输出，便于日志记录
+                processBuilder.redirectErrorStream(true)
                 
                 val process = processBuilder.start()
                 runningProcesses[configId] = process
@@ -158,10 +205,13 @@ class FRPService : Service() {
                 )
                 processStatus[configId] = status
                 
-                // 监控进程状态
+                LogManager.s(TAG, "FRP进程启动成功 PID: ${status.pid}", configId)
+                
+                // 监控进程状态和输出
                 monitorProcess(configId, process)
                 
             } catch (e: Exception) {
+                LogManager.e(TAG, "启动FRP进程失败", e, configId)
                 val status = FRPStatus(
                     configId = configId,
                     isRunning = false,
@@ -170,29 +220,42 @@ class FRPService : Service() {
                 processStatus[configId] = status
             }
         }
-    }
-    
+    }    
     /**
      * 停止FRP进程
      */
     fun stopFRPProcess(configId: String) {
         runningProcesses[configId]?.let { process ->
             try {
+                LogManager.i(TAG, "停止FRP进程", configId)
+                
                 process.destroy()
                 runningProcesses.remove(configId)
                 processStatus[configId] = FRPStatus(
                     configId = configId,
                     isRunning = false
                 )
+                
+                LogManager.s(TAG, "FRP进程已停止", configId)
+                
             } catch (e: Exception) {
+                LogManager.w(TAG, "正常停止失败，尝试强制停止", configId = configId)
+                
                 // 强制杀死进程 qwq
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    process.destroyForcibly()
-                } else {
-                    process.destroy()
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        process.destroyForcibly()
+                    } else {
+                        process.destroy()
+                    }
+                    runningProcesses.remove(configId)
+                    LogManager.s(TAG, "FRP进程强制停止成功", configId)
+                } catch (ex: Exception) {
+                    LogManager.e(TAG, "强制停止进程失败", ex, configId)
                 }
-                runningProcesses.remove(configId)
             }
+        } ?: run {
+            LogManager.w(TAG, "进程不存在或已停止", configId)
         }
     }
     
@@ -210,15 +273,42 @@ class FRPService : Service() {
         return processStatus.filter { it.value.isRunning }
     }
     
+    /**
+     * 监控进程状态和输出
+     */
     private fun monitorProcess(configId: String, process: Process) {
+        // 监控进程输出
+        serviceScope.launch {
+            try {
+                val reader = BufferedReader(InputStreamReader(process.inputStream))
+                var line: String?
+                
+                while (reader.readLine().also { line = it } != null) {
+                    line?.let { output ->
+                        // 根据输出内容判断是否为错误信息
+                        val isError = output.contains("error", ignoreCase = true) || 
+                                     output.contains("failed", ignoreCase = true) ||
+                                     output.contains("panic", ignoreCase = true)
+                        
+                        LogManager.logFRPProcess(configId, output, isError)
+                    }
+                }
+            } catch (e: Exception) {
+                LogManager.e(TAG, "读取进程输出失败", e, configId)
+            }
+        }
+        
+        // 监控进程退出
         serviceScope.launch {
             try {
                 val exitCode = process.waitFor()
                 runningProcesses.remove(configId)
                 
                 val status = if (exitCode == 0) {
+                    LogManager.i(TAG, "进程正常退出", configId)
                     FRPStatus(configId = configId, isRunning = false)
                 } else {
+                    LogManager.e(TAG, "进程异常退出，退出码: $exitCode", configId = configId)
                     FRPStatus(
                         configId = configId,
                         isRunning = false,
@@ -228,6 +318,7 @@ class FRPService : Service() {
                 processStatus[configId] = status
                 
             } catch (e: Exception) {
+                LogManager.e(TAG, "监控进程失败", e, configId)
                 runningProcesses.remove(configId)
                 processStatus[configId] = FRPStatus(
                     configId = configId,
@@ -258,6 +349,8 @@ class FRPService : Service() {
         }
         
         configFile.writeText(configContent)
+        LogManager.d(TAG, "配置文件已生成: ${configFile.absolutePath}", config.id)
+        
         return configFile
     }
     
@@ -265,32 +358,63 @@ class FRPService : Service() {
      * 生成客户端配置文件内容
      */
     private fun generateClientConfig(config: FRPConfig): String {
-        return """
-            serverAddr = "${config.serverAddr}"
-            serverPort = ${config.serverPort}
-            
-            [[proxies]]
-            name = "${config.name}"
-            type = "${config.proxyType}"
-            localIP = "${config.localIP}"
-            localPort = ${config.localPort}
-            remotePort = ${config.remotePort}
-        """.trimIndent()
+        val configBuilder = StringBuilder()
+        
+        // 基本服务器配置
+        configBuilder.appendLine("serverAddr = \"${config.serverAddr}\"")
+        configBuilder.appendLine("serverPort = ${config.serverPort}")
+        
+        // Token认证 qwq
+        if (!config.token.isNullOrBlank()) {
+            configBuilder.appendLine("auth.token = \"${config.token}\"")
+            LogManager.d(TAG, "客户端配置包含Token认证", config.id)
+        }
+        
+        configBuilder.appendLine()
+        
+        // 代理配置
+        configBuilder.appendLine("[[proxies]]")
+        configBuilder.appendLine("name = \"${config.name}\"")
+        configBuilder.appendLine("type = \"${config.proxyType}\"")
+        
+        if (!config.localIP.isNullOrBlank()) {
+            configBuilder.appendLine("localIP = \"${config.localIP}\"")
+        }
+        
+        config.localPort?.let {
+            configBuilder.appendLine("localPort = $it")
+        }
+        
+        config.remotePort?.let {
+            configBuilder.appendLine("remotePort = $it")
+        }
+        
+        return configBuilder.toString()
     }
     
     /**
      * 生成服务端配置文件内容
      */
     private fun generateServerConfig(config: FRPConfig): String {
-        return """
-            bindPort = ${config.serverPort}
-            
-            # 可选配置 qwq
-            # dashboardAddr = "0.0.0.0"
-            # dashboardPort = 7500
-            # dashboardUser = "admin"
-            # dashboardPwd = "admin"
-        """.trimIndent()
+        val configBuilder = StringBuilder()
+        
+        // 基本绑定配置
+        configBuilder.appendLine("bindPort = ${config.serverPort}")
+        
+        // Token认证 AWA
+        if (!config.token.isNullOrBlank()) {
+            configBuilder.appendLine("auth.token = \"${config.token}\"")
+            LogManager.d(TAG, "服务端配置包含Token认证", config.id)
+        }
+        
+        configBuilder.appendLine()
+        configBuilder.appendLine("# 可选的Web管理界面配置 qwq")
+        configBuilder.appendLine("# webServer.addr = \"0.0.0.0\"")
+        configBuilder.appendLine("# webServer.port = 7500")
+        configBuilder.appendLine("# webServer.user = \"admin\"")
+        configBuilder.appendLine("# webServer.password = \"admin\"")
+        
+        return configBuilder.toString()
     }
     
     private fun buildFRPCommand(config: FRPConfig, configFile: File): List<String> {
@@ -316,6 +440,8 @@ class FRPService : Service() {
     
     override fun onDestroy() {
         super.onDestroy()
+        LogManager.i(TAG, "FRP服务正在关闭...")
+        
         serviceScope.cancel()
         
         // 停止所有运行中的进程 AWA
@@ -332,5 +458,9 @@ class FRPService : Service() {
         }
         runningProcesses.clear()
         processStatus.clear()
+        
+        // 保存日志到文件
+        LogManager.saveLogsToFile(this)
+        LogManager.i(TAG, "FRP服务已关闭 qwq")
     }
 }

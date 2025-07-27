@@ -27,6 +27,7 @@ fun AddConfigDialog(
     var remotePort by remember { mutableStateOf("") }
     var protocol by remember { mutableStateOf("tcp") }
     var proxyType by remember { mutableStateOf("tcp") } // 新增代理类型字段 qwq
+    var token by remember { mutableStateOf("") } // 添加token字段 AWA
     var autoStart by remember { mutableStateOf(false) }
     
     AlertDialog(
@@ -69,6 +70,15 @@ fun AddConfigDialog(
                     singleLine = true
                 )
                 
+                // Token字段 - 用于身份验证 喵～
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = { token = it },
+                    label = { Text(stringResource(R.string.token)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
                 if (type == FRPType.CLIENT) {
                     OutlinedTextField(
                         value = localPort,
@@ -103,8 +113,8 @@ fun AddConfigDialog(
                             label = { Text("代理类型") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                             modifier = Modifier
-                                .fillMaxWidth()
                                 .menuAnchor()
+                                .fillMaxWidth()
                         )
                         ExposedDropdownMenu(
                             expanded = expanded,
@@ -155,11 +165,11 @@ fun AddConfigDialog(
                         type = type,
                         serverAddr = serverAddr,
                         serverPort = serverPort.toIntOrNull() ?: 0,
-                        localIP = "127.0.0.1", // 默认本地IP qwq
                         localPort = localPort.toIntOrNull() ?: 0,
                         remotePort = remotePort.toIntOrNull() ?: 0,
                         protocol = protocol,
                         proxyType = proxyType, // 添加代理类型 喵～
+                        token = if (token.isNotBlank()) token else null, // 添加token AWA
                         autoStart = autoStart
                     )
                     onConfirm(config)
