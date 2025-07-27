@@ -735,8 +735,6 @@ class FRPService : Service() {
         LogManager.saveLogsToFile(this)
         LogManager.i(TAG, "FRP服务已关闭 qwq")
     }
-}
-
     /**
      * 诊断FRP环境 qwq
      * 用于排查启动问题
@@ -906,121 +904,7 @@ class FRPService : Service() {
         
         return result
     }
-    
-    private fun getConfigById(configId: String): FRPConfig? {
-        // 从ConfigManager获取配置 AWA
-        return ConfigManager.getAllConfigs(this).find { it.id == configId }
-    }
-    
-    private fun createConfigFile(config: FRPConfig): File {
-        val configDir = File(filesDir, "frp/configs")
-        if (!configDir.exists()) {
-            configDir.mkdirs()
-            LogManager.d(TAG, "创建配置目录: ${configDir.absolutePath}", config.id)
-        }
-        
-        val configFile = File(configDir, "${config.id}.toml")
-        
-        // 根据配置类型生成TOML配置文件内容 喵～
-        val configContent = when (config.type) {
-            FRPType.CLIENT -> generateClientConfig(config)
-            FRPType.SERVER -> generateServerConfig(config)
-        }
-        
-        LogManager.d(TAG, "生成的配置文件内容:\n$configContent", config.id)
-        
-        configFile.writeText(configContent)
-        LogManager.d(TAG, "配置文件已生成: ${configFile.absolutePath}", config.id)
-        
-        return configFile
-    }
-    
-    /**
-     * 生成客户端配置文件内容
-     */
-    private fun generateClientConfig(config: FRPConfig): String {
-        val configBuilder = StringBuilder()
-        
-        // 基本服务器配置
-        configBuilder.appendLine("serverAddr = \"${config.serverAddr}\"")
-        configBuilder.appendLine("serverPort = ${config.serverPort}")
-        
-        // Token认证 qwq
-        if (!config.token.isNullOrBlank()) {
-            configBuilder.appendLine("auth.token = \"${config.token}\"")
-            LogManager.d(TAG, "客户端配置包含Token认证", config.id)
-        }
-        
-        configBuilder.appendLine()
-        
-        // 代理配置
-        configBuilder.appendLine("[[proxies]]")
-        configBuilder.appendLine("name = \"${config.name}\"")
-        configBuilder.appendLine("type = \"${config.proxyType}\"")
-        
-        if (!config.localIP.isNullOrBlank()) {
-            configBuilder.appendLine("localIP = \"${config.localIP}\"")
-        }
-        
-        config.localPort?.let {
-            configBuilder.appendLine("localPort = $it")
-        }
-        
-        config.remotePort?.let {
-            configBuilder.appendLine("remotePort = $it")
-        }
-        
-        return configBuilder.toString()
-    }
-    
-    /**
-     * 生成服务端配置文件内容
-     */
-    private fun generateServerConfig(config: FRPConfig): String {
-        val configBuilder = StringBuilder()
-        
-        // 基本绑定配置
-        configBuilder.appendLine("bindPort = ${config.serverPort}")
-        
-        // Token认证 AWA
-        if (!config.token.isNullOrBlank()) {
-            configBuilder.appendLine("auth.token = \"${config.token}\"")
-            LogManager.d(TAG, "服务端配置包含Token认证", config.id)
-        }
-        
-        configBuilder.appendLine()
-        configBuilder.appendLine("# 可选的Web管理界面配置 qwq")
-        configBuilder.appendLine("# webServer.addr = \"0.0.0.0\"")
-        configBuilder.appendLine("# webServer.port = 7500")
-        configBuilder.appendLine("# webServer.user = \"admin\"")
-        configBuilder.appendLine("# webServer.password = \"admin\"")
-        
-        return configBuilder.toString()
-    }
-    
-    private fun buildFRPCommand(config: FRPConfig, configFile: File): List<String> {
-        val frpDir = File(filesDir, "frp")
-        val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
-        val executableFile = File(frpDir, executable)
-        
-        // 在Android环境下，直接执行二进制文件 AWA
-        return listOf(
-            executableFile.absolutePath,
-            "-c",
-            configFile.absolutePath
-        )
-    }
-    
-    private fun getPid(process: Process): Int? {
-        return try {
-            val field = process.javaClass.getDeclaredField("pid")
-            field.isAccessible = true
-            field.getInt(process)
-        } catch (e: Exception) {
-            null
-        }
-    }
-    
+
     override fun onDestroy() {
         super.onDestroy()
         LogManager.i(TAG, "FRP服务正在关闭...")
