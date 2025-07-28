@@ -717,7 +717,7 @@ class FRPService : Service() {
      */
     private fun getConfigById(configId: String): FRPConfig? {
         return try {
-            ConfigManager.getAllConfigs(this).find { it.id == configId }
+            ConfigManager.getAllConfigs(this).find { config -> config.id == configId }
         } catch (e: Exception) {
             LogManager.e(TAG, "获取配置失败: ${e.message}")
             null
