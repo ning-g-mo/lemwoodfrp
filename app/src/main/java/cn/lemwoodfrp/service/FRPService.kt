@@ -155,8 +155,8 @@ class FRPService : Service() {
                     LogManager.d(TAG, "现有PRoot文件看起来有效，跳过复制")
                     // 确保执行权限
                     if (!prootFile.canExecute()) {
-                        val chmodResult = Runtime.getRuntime().exec("chmod 755 ${prootFile.absolutePath}").waitFor()
-                        LogManager.d(TAG, "设置PRoot执行权限，结果: $chmodResult")
+                        val success = prootFile.setExecutable(true, true)
+                        LogManager.d(TAG, "设置PRoot执行权限，结果: $success")
                     }
                     return@withContext
                 }
@@ -174,13 +174,11 @@ class FRPService : Service() {
                 LogManager.s(TAG, "✅ PRoot复制完成，大小: ${prootFile.length()} bytes")
                 
                 // 设置执行权限
-                val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${prootFile.absolutePath}")
-                val chmodResult = chmodProcess.waitFor()
-                
-                if (chmodResult == 0) {
+                val success = prootFile.setExecutable(true, true)
+                if (success) {
                     LogManager.s(TAG, "✅ PRoot执行权限设置成功")
                 } else {
-                    LogManager.w(TAG, "⚠️ PRoot执行权限设置可能失败，退出码: $chmodResult")
+                    LogManager.w(TAG, "⚠️ PRoot执行权限设置可能失败")
                 }
                 
                 // 验证文件
@@ -264,8 +262,7 @@ class FRPService : Service() {
                     copyAssetFile("$termuxAssetDir/bin/$binary", targetFile)
                     
                     // 设置执行权限
-                    val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${targetFile.absolutePath}")
-                    chmodProcess.waitFor()
+                    targetFile.setExecutable(true, true)
                     
                 } catch (e: FileNotFoundException) {
                     LogManager.w(TAG, "Termux二进制文件不存在: $binary，跳过")
@@ -296,8 +293,7 @@ class FRPService : Service() {
             try {
                 copyAssetFile("termux/startup.sh", File(termuxRoot, "startup.sh"))
                 val startupFile = File(termuxRoot, "startup.sh")
-                val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${startupFile.absolutePath}")
-                chmodProcess.waitFor()
+                startupFile.setExecutable(true, true)
                 LogManager.d(TAG, "复制启动脚本成功 qwq")
             } catch (e: Exception) {
                 LogManager.w(TAG, "复制启动脚本失败: ${e.message}")
@@ -451,9 +447,8 @@ class FRPService : Service() {
                         LogManager.d(TAG, "现有frpc文件看起来有效，跳过复制")
                         // 确保执行权限
                         if (!frpcFile.canExecute()) {
-                            val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${frpcFile.absolutePath}")
-                            val chmodResult = chmodProcess.waitFor()
-                            LogManager.d(TAG, "设置frpc执行权限，结果: $chmodResult")
+                            val success = frpcFile.setExecutable(true, true)
+                            LogManager.d(TAG, "设置frpc执行权限，结果: $success")
                         }
                     } else {
                         LogManager.w(TAG, "现有frpc文件太小，重新复制")
@@ -469,13 +464,8 @@ class FRPService : Service() {
                 copyAssetFile("$frpAssetDir/frpc", frpcFile)
                 
                 // 设置执行权限
-                val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${frpcFile.absolutePath}")
-                val chmodResult = chmodProcess.waitFor()
-                val errorOutput = chmodProcess.errorStream.bufferedReader().readText()
-                if (errorOutput.isNotEmpty()) {
-                    LogManager.w(TAG, "chmod frpc 错误输出: $errorOutput")
-                }
-                LogManager.d(TAG, "frpc chmod结果: $chmodResult")
+                val success = frpcFile.setExecutable(true, true)
+                LogManager.d(TAG, "frpc setExecutable结果: $success")
             }
             
             // 复制frps
@@ -498,9 +488,8 @@ class FRPService : Service() {
                         LogManager.d(TAG, "现有frps文件看起来有效，跳过复制")
                         // 确保执行权限
                         if (!frpsFile.canExecute()) {
-                            val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${frpsFile.absolutePath}")
-                            val chmodResult = chmodProcess.waitFor()
-                            LogManager.d(TAG, "设置frps执行权限，结果: $chmodResult")
+                            val success = frpsFile.setExecutable(true, true)
+                            LogManager.d(TAG, "设置frps执行权限，结果: $success")
                         }
                     } else {
                         LogManager.w(TAG, "现有frps文件太小，重新复制")
