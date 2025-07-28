@@ -1,0 +1,9 @@
+#!/system/bin/sh
+# Termux ls wrapper - 简化版本 AWA
+if [ "$1" = "-la" ] || [ "$1" = "-al" ]; then
+    /system/bin/ls -la "$@"
+elif [ "$1" = "-l" ]; then
+    /system/bin/ls -l "$@"
+else
+    /system/bin/ls "$@"
+fi

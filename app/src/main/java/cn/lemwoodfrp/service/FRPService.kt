@@ -53,15 +53,35 @@ class FRPService : Service() {
         return File("/data/data/cn.lemwoodfrp")
     }
 
+    /**
+     * 获取Termux环境根目录 AWA
+     * 内置的完整Linux环境
+     */
+    private fun getTermuxRootDir(): File {
+        return File(getAppPrivateDir(), "termux-rootfs")
+    }
+
+    /**
+     * 检查是否启用Termux环境 喵～
+     * 可以通过配置文件或用户设置来控制
+     */
+    private fun isTermuxEnvironmentEnabled(): Boolean {
+        // 这里可以添加配置检查逻辑
+        // 暂时默认启用，如果Termux环境存在的话
+        val termuxRoot = getTermuxRootDir()
+        return termuxRoot.exists() && File(termuxRoot, "bin").exists()
+    }
+
     override fun onCreate() {
         super.onCreate()
         LogManager.i(TAG, "🎯 FRPService 创建")
         createNotificationChannel()
         
-        // 初始化PRoot和FRP环境 AWA
+        // 初始化PRoot、Termux和FRP环境 AWA
         serviceScope.launch {
             try {
                 initializePRoot()
+                initializeTermuxEnvironment()
                 initializeFRPBinaries()
                 LogManager.s(TAG, "✅ FRP服务初始化完成")
             } catch (e: Exception) {
@@ -178,6 +198,218 @@ class FRPService : Service() {
         } catch (e: Exception) {
             LogManager.e(TAG, "❌ PRoot初始化失败: ${e.message}")
             throw e
+        }
+    }
+
+    /**
+     * 初始化Termux环境 AWA
+     * 内置完整的Linux环境，包含bash、coreutils等
+     */
+    private suspend fun initializeTermuxEnvironment() = withContext(Dispatchers.IO) {
+        try {
+            LogManager.i(TAG, "🐧 开始初始化Termux环境")
+            
+            val termuxRoot = getTermuxRootDir()
+            if (!termuxRoot.exists()) {
+                termuxRoot.mkdirs()
+                LogManager.d(TAG, "创建Termux根目录: ${termuxRoot.absolutePath}")
+            }
+            
+            val architecture = detectArchitecture()
+            LogManager.i(TAG, "为架构 $architecture 初始化Termux环境")
+            
+            // 创建基本目录结构 喵～
+            val binDir = File(termuxRoot, "bin")
+            val libDir = File(termuxRoot, "lib")
+            val etcDir = File(termuxRoot, "etc")
+            val usrDir = File(termuxRoot, "usr")
+            val tmpDir = File(termuxRoot, "tmp")
+            
+            listOf(binDir, libDir, etcDir, usrDir, tmpDir).forEach { dir ->
+                if (!dir.exists()) {
+                    dir.mkdirs()
+                    LogManager.d(TAG, "创建目录: ${dir.absolutePath}")
+                }
+            }
+            
+            // 复制Termux基础文件
+            copyTermuxAssets(architecture, termuxRoot)
+            
+            // 设置环境变量文件
+            setupTermuxEnvironment(termuxRoot)
+            
+            LogManager.s(TAG, "✅ Termux环境初始化完成")
+            
+        } catch (e: Exception) {
+            LogManager.e(TAG, "❌ Termux环境初始化失败: ${e.message}")
+            throw e
+        }
+    }
+    
+    /**
+     * 复制Termux资源文件 qwq
+     */
+    private suspend fun copyTermuxAssets(architecture: String, termuxRoot: File) = withContext(Dispatchers.IO) {
+        try {
+            val termuxAssetDir = "termux/$architecture"
+            LogManager.i(TAG, "从 $termuxAssetDir 复制Termux资源")
+            
+            // 复制基础二进制文件
+            val binaries = listOf("bash", "sh", "ls", "cat", "echo")
+            val binDir = File(termuxRoot, "bin")
+            
+            binaries.forEach { binary ->
+                try {
+                    val targetFile = File(binDir, binary)
+                    copyAssetFile("$termuxAssetDir/bin/$binary", targetFile)
+                    
+                    // 设置执行权限
+                    val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${targetFile.absolutePath}")
+                    chmodProcess.waitFor()
+                    
+                } catch (e: FileNotFoundException) {
+                    LogManager.w(TAG, "Termux二进制文件不存在: $binary，跳过")
+                } catch (e: Exception) {
+                    LogManager.w(TAG, "复制Termux二进制文件失败: $binary - ${e.message}")
+                }
+            }
+            
+            // 复制库文件 AWA
+            try {
+                val libDir = File(termuxRoot, "lib")
+                // 暂时跳过库文件复制，因为我们使用系统库
+                LogManager.d(TAG, "跳过库文件复制，使用系统库 喵～")
+            } catch (e: Exception) {
+                LogManager.w(TAG, "复制Termux库文件时出错: ${e.message}")
+            }
+            
+            // 复制环境配置文件 qwq
+            try {
+                val etcDir = File(termuxRoot, "etc")
+                copyAssetFile("termux/environment.sh", File(etcDir, "environment.sh"))
+                LogManager.d(TAG, "复制环境配置文件成功 AWA")
+            } catch (e: Exception) {
+                LogManager.w(TAG, "复制环境配置文件失败: ${e.message}")
+            }
+            
+            // 复制启动脚本 喵～
+            try {
+                copyAssetFile("termux/startup.sh", File(termuxRoot, "startup.sh"))
+                val startupFile = File(termuxRoot, "startup.sh")
+                val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${startupFile.absolutePath}")
+                chmodProcess.waitFor()
+                LogManager.d(TAG, "复制启动脚本成功 qwq")
+            } catch (e: Exception) {
+                LogManager.w(TAG, "复制启动脚本失败: ${e.message}")
+            }
+            
+        } catch (e: Exception) {
+            LogManager.e(TAG, "❌ 复制Termux资源失败: ${e.message}")
+        }
+    }
+    
+    /**
+     * 设置Termux环境变量 AWA
+     */
+    private fun setupTermuxEnvironment(termuxRoot: File) {
+        try {
+            val etcDir = File(termuxRoot, "etc")
+            
+            // 创建环境配置文件
+            val envFile = File(etcDir, "environment")
+            val envContent = """
+                export PATH="${termuxRoot.absolutePath}/bin:${'$'}PATH"
+                export LD_LIBRARY_PATH="${termuxRoot.absolutePath}/lib:${'$'}LD_LIBRARY_PATH"
+                export TERMUX_PREFIX="${termuxRoot.absolutePath}"
+                export HOME="${termuxRoot.absolutePath}/home"
+                export TMPDIR="${termuxRoot.absolutePath}/tmp"
+            """.trimIndent()
+            
+            envFile.writeText(envContent)
+            LogManager.d(TAG, "创建Termux环境配置文件")
+            
+            // 创建home目录
+            val homeDir = File(termuxRoot, "home")
+            if (!homeDir.exists()) {
+                homeDir.mkdirs()
+            }
+            
+        } catch (e: Exception) {
+            LogManager.e(TAG, "❌ 设置Termux环境失败: ${e.message}")
+        }
+    }
+    
+    /**
+     * 使用Termux环境启动FRP进程 喵～
+     */
+    private fun startFRPWithTermux(configId: String, config: FRPConfig): Process? {
+        try {
+            LogManager.i(TAG, "🐧 使用Termux环境启动FRP进程", configId)
+            
+            val termuxRoot = getTermuxRootDir()
+            val frpDir = File(getAppPrivateDir(), "frp")
+            val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
+            val frpExecutable = File(frpDir, executable)
+            val configFile = File(frpDir, "$configId.toml")
+            
+            // 验证Termux环境
+            if (!isTermuxEnvironmentEnabled()) {
+                LogManager.w(TAG, "Termux环境不可用")
+                return null
+            }
+            
+            if (!frpExecutable.exists() || !frpExecutable.canExecute()) {
+                LogManager.e(TAG, "FRP可执行文件不可用: ${frpExecutable.absolutePath}")
+                return null
+            }
+            
+            // 构建Termux启动命令 AWA
+            val bashPath = File(termuxRoot, "bin/bash").absolutePath
+            val envFile = File(termuxRoot, "etc/environment.sh").absolutePath
+            val startupScript = File(termuxRoot, "startup.sh").absolutePath
+            
+            // 首先运行启动脚本初始化环境 qwq
+            val initCommand = arrayOf(
+                "/system/bin/sh",
+                startupScript
+            )
+            
+            LogManager.d(TAG, "初始化Termux环境: ${initCommand.joinToString(" ")}")
+            val initProcess = ProcessBuilder(*initCommand).start()
+            val initResult = initProcess.waitFor()
+            
+            if (initResult != 0) {
+                LogManager.w(TAG, "Termux环境初始化失败，退出码: $initResult")
+            }
+            
+            // 构建FRP启动命令 喵～
+            val command = arrayOf(
+                bashPath,
+                "-c",
+                "source $envFile && cd ${frpDir.absolutePath} && ${frpExecutable.absolutePath} -c ${configFile.absolutePath}"
+            )
+            
+            LogManager.i(TAG, "Termux命令: ${command.joinToString(" ")}", configId)
+            
+            val processBuilder = ProcessBuilder(*command)
+            processBuilder.directory(frpDir)
+            processBuilder.redirectErrorStream(true)
+            
+            // 设置环境变量 AWA
+            val env = processBuilder.environment()
+            env["TERMUX_PREFIX"] = termuxRoot.absolutePath
+            env["TERMUX_HOME"] = "${termuxRoot.absolutePath}/home"
+            env["PATH"] = "${termuxRoot.absolutePath}/bin:/system/bin:/system/xbin"
+            env["LD_LIBRARY_PATH"] = "${termuxRoot.absolutePath}/lib:/system/lib:/system/lib64"
+            env["HOME"] = "${termuxRoot.absolutePath}/home"
+            env["TMPDIR"] = "${termuxRoot.absolutePath}/tmp"
+            env["SHELL"] = bashPath
+            
+            return processBuilder.start()
+            
+        } catch (e: Exception) {
+            LogManager.e(TAG, "❌ Termux启动失败: ${e.message}", e, configId)
+            return null
         }
     }
 
@@ -542,21 +774,30 @@ class FRPService : Service() {
                 LogManager.d(TAG, "配置文件路径: ${configFile.absolutePath}", configId)
                 LogManager.d(TAG, "配置文件内容:\\n$configContent", configId)
                 
-                // 智能启动策略：优先使用PRoot，失败时回退到直接启动 AWA
+                // 智能启动策略：优先使用Termux，然后PRoot，最后直接启动 AWA
                 LogManager.i(TAG, "🚀 尝试启动进程", configId)
                 
                 var process: Process? = null
                 var startMethod = ""
                 
-                // 首先尝试PRoot启动
-                val prootFile = File(getAppPrivateDir(), "proot/proot")
-                if (prootFile.exists() && prootFile.canExecute()) {
-                    LogManager.i(TAG, "🐧 尝试使用PRoot启动", configId)
-                    process = startFRPWithPRoot(configId, config)
-                    startMethod = "PRoot"
+                // 首先尝试Termux启动
+                if (isTermuxEnvironmentEnabled()) {
+                    LogManager.i(TAG, "🐧 尝试使用Termux启动", configId)
+                    process = startFRPWithTermux(configId, config)
+                    startMethod = "Termux"
                 }
                 
-                // 如果PRoot失败，回退到直接启动
+                // 如果Termux失败，尝试PRoot启动
+                if (process == null) {
+                    val prootFile = File(getAppPrivateDir(), "proot/proot")
+                    if (prootFile.exists() && prootFile.canExecute()) {
+                        LogManager.i(TAG, "🐧 尝试使用PRoot启动", configId)
+                        process = startFRPWithPRoot(configId, config)
+                        startMethod = "PRoot"
+                    }
+                }
+                
+                // 如果都失败，回退到直接启动
                 if (process == null) {
                     LogManager.i(TAG, "🔧 使用直接启动方式", configId)
                     process = startFRPDirect(configId, config)
@@ -793,6 +1034,202 @@ class FRPService : Service() {
                 "arm64-v8a"
             }
         }
+    }
+
+    /**
+     * 智能环境选择器 AWA
+     * 根据设备性能和环境可用性选择最佳启动方式
+     */
+    private fun selectBestEnvironment(): String {
+        try {
+            LogManager.i(TAG, "🤖 开始智能环境选择")
+            
+            // 检查Termux环境 喵～
+            val termuxRoot = getTermuxRootDir()
+            val bashFile = File(termuxRoot, "bin/bash")
+            val envFile = File(termuxRoot, "etc/environment.sh")
+            val startupScript = File(termuxRoot, "startup.sh")
+            
+            val termuxAvailable = termuxRoot.exists() && 
+                                bashFile.exists() && bashFile.canExecute() &&
+                                envFile.exists() &&
+                                startupScript.exists() && startupScript.canExecute()
+            
+            if (termuxAvailable) {
+                LogManager.i(TAG, "✅ Termux环境完整可用，优先使用 AWA")
+                return "termux"
+            } else {
+                LogManager.w(TAG, "⚠️ Termux环境不完整: root=${termuxRoot.exists()}, bash=${bashFile.exists()}, env=${envFile.exists()}, startup=${startupScript.exists()}")
+            }
+            
+            // 检查PRoot环境
+            val prootFile = File(getAppPrivateDir(), "proot/proot")
+            if (prootFile.exists() && prootFile.canExecute()) {
+                LogManager.i(TAG, "✅ PRoot环境可用")
+                return "proot"
+            }
+            
+            // 回退到直接启动
+            LogManager.i(TAG, "⚠️ 使用直接启动模式 qwq")
+            return "direct"
+            
+        } catch (e: Exception) {
+            LogManager.e(TAG, "❌ 环境选择失败: ${e.message}")
+            return "direct"
+        }
+    }
+    
+    /**
+     * 环境诊断报告 qwq
+     * 包含Termux、PRoot和FRP环境的完整诊断
+     */
+    fun diagnoseAllEnvironments(): String {
+        val report = StringBuilder()
+        
+        try {
+            report.appendLine("=== 🔍 完整环境诊断报告 ===")
+            report.appendLine("生成时间: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}")
+            report.appendLine("设备架构: ${detectArchitecture()}")
+            report.appendLine("Android版本: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+            report.appendLine("设备型号: ${Build.MODEL}")
+            report.appendLine("制造商: ${Build.MANUFACTURER}")
+            report.appendLine()
+            
+            // Termux环境检查 AWA
+            report.appendLine("🐧 【Termux环境检查】")
+            val termuxRoot = getTermuxRootDir()
+            report.appendLine("根目录: ${termuxRoot.absolutePath}")
+            report.appendLine("存在: ${termuxRoot.exists()}")
+            
+            if (termuxRoot.exists()) {
+                // 检查基本目录结构
+                val binDir = File(termuxRoot, "bin")
+                val libDir = File(termuxRoot, "lib")
+                val etcDir = File(termuxRoot, "etc")
+                val homeDir = File(termuxRoot, "home")
+                val tmpDir = File(termuxRoot, "tmp")
+                
+                report.appendLine("目录结构:")
+                report.appendLine("  bin/: ${binDir.exists()}")
+                report.appendLine("  lib/: ${libDir.exists()}")
+                report.appendLine("  etc/: ${etcDir.exists()}")
+                report.appendLine("  home/: ${homeDir.exists()}")
+                report.appendLine("  tmp/: ${tmpDir.exists()}")
+                
+                // 检查关键文件 喵～
+                val bashFile = File(binDir, "bash")
+                val shFile = File(binDir, "sh")
+                val envFile = File(etcDir, "environment.sh")
+                val startupScript = File(termuxRoot, "startup.sh")
+                
+                report.appendLine("关键文件:")
+                report.appendLine("  bash: ${bashFile.exists() && bashFile.canExecute()}")
+                report.appendLine("  sh: ${shFile.exists() && shFile.canExecute()}")
+                report.appendLine("  环境配置: ${envFile.exists()}")
+                report.appendLine("  启动脚本: ${startupScript.exists() && startupScript.canExecute()}")
+                
+                // 检查基础工具 AWA
+                if (binDir.exists()) {
+                    val tools = listOf("ls", "cat", "echo")
+                    val availableTools = tools.filter { tool ->
+                        val toolFile = File(binDir, tool)
+                        toolFile.exists() && toolFile.canExecute()
+                    }
+                    report.appendLine("  可用工具: ${availableTools.joinToString(", ")}")
+                    
+                    val allFiles = binDir.listFiles()?.map { it.name }?.sorted() ?: emptyList()
+                    report.appendLine("  所有文件: ${allFiles.joinToString(", ")}")
+                }
+                
+                // 检查环境配置内容 qwq
+                if (envFile.exists()) {
+                    try {
+                        val envContent = envFile.readText()
+                        val hasTermuxPrefix = envContent.contains("TERMUX_PREFIX")
+                        val hasPath = envContent.contains("PATH")
+                        report.appendLine("  环境配置完整性: PREFIX=$hasTermuxPrefix, PATH=$hasPath")
+                    } catch (e: Exception) {
+                        report.appendLine("  环境配置读取失败: ${e.message}")
+                    }
+                }
+            }
+            report.appendLine("整体可用性: ${isTermuxEnvironmentEnabled()}")
+            report.appendLine()
+            
+            // PRoot环境检查
+            report.appendLine("🐧 【PRoot环境检查】")
+            val prootDir = File(getAppPrivateDir(), "proot")
+            val prootFile = File(prootDir, "proot")
+            report.appendLine("目录: ${prootDir.absolutePath}")
+            report.appendLine("存在: ${prootDir.exists()}")
+            report.appendLine("可执行文件: ${prootFile.exists() && prootFile.canExecute()}")
+            if (prootFile.exists()) {
+                report.appendLine("文件大小: ${prootFile.length()} bytes")
+            }
+            report.appendLine()
+            
+            // FRP环境检查
+            report.appendLine("🚀 【FRP环境检查】")
+            val frpDir = File(getAppPrivateDir(), "frp")
+            report.appendLine("目录: ${frpDir.absolutePath}")
+            report.appendLine("存在: ${frpDir.exists()}")
+            if (frpDir.exists()) {
+                val frpcFile = File(frpDir, "frpc")
+                val frpsFile = File(frpDir, "frps")
+                report.appendLine("frpc可用: ${frpcFile.exists() && frpcFile.canExecute()}")
+                report.appendLine("frps可用: ${frpsFile.exists() && frpsFile.canExecute()}")
+                
+                val files = frpDir.listFiles()?.map { "${it.name} (${if(it.isDirectory()) "目录" else "${it.length()} bytes"})" }?.sorted() ?: emptyList()
+                report.appendLine("目录内容: ${files.joinToString(", ")}")
+            }
+            report.appendLine()
+            
+            // 运行状态
+            report.appendLine("📊 【运行状态】")
+            report.appendLine("当前运行进程数: ${runningProcesses.size}")
+            if (runningProcesses.isNotEmpty()) {
+                runningProcesses.forEach { (configId, process) ->
+                    val isAlive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
+                        process.isAlive 
+                    } else { 
+                        try { 
+                            process.exitValue() 
+                            false 
+                        } catch (e: IllegalThreadStateException) { 
+                            true 
+                        } 
+                    }
+                    report.appendLine("  $configId: ${if(isAlive) "运行中" else "已停止"} (PID: ${getPid(process)})")
+                }
+            }
+            report.appendLine()
+            
+            // 推荐启动方式
+            val bestEnv = selectBestEnvironment()
+            val envName = when(bestEnv) {
+                "termux" -> "Termux环境 (推荐)"
+                "proot" -> "PRoot环境"
+                "direct" -> "直接启动"
+                else -> "未知"
+            }
+            report.appendLine("🎯 【推荐启动方式】: $envName")
+            
+            when(bestEnv) {
+                "termux" -> report.appendLine("✅ 完整Linux环境，最佳兼容性和稳定性")
+                "proot" -> report.appendLine("⚠️ 用户空间chroot，良好兼容性但性能略低")
+                "direct" -> report.appendLine("⚠️ 直接启动，可能存在权限问题")
+            }
+            
+        } catch (e: Exception) {
+            report.appendLine("❌ 诊断过程出错: ${e.message}")
+        }
+        
+        report.appendLine()
+        report.appendLine("=== 诊断报告结束 ===")
+        
+        val result = report.toString()
+        LogManager.i(TAG, "完整环境诊断完成")
+        return result
     }
 
     /**
