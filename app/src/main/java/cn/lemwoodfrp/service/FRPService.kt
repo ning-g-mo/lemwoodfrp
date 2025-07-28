@@ -496,7 +496,7 @@ class FRPService : Service() {
                         LogManager.i(TAG, "    * ${file.name} (${file.length()} bytes, 可执行: ${file.canExecute()})", configId)
                     }
                 } else {
-                    LogManager.e(TAG, "❌ FRP目录不存在", configId)
+                    LogManager.e(TAG, "❌ FRP目录不存在", configId = configId)
                 }
                 
                 if (!frpExecutable.exists()) {
@@ -715,9 +715,9 @@ class FRPService : Service() {
     /**
      * 获取配置信息
      */
-    private fun getConfigById(configId: String): FRPConfig? {
+    private fun getConfigById(configId: String): cn.lemwoodfrp.utils.FRPConfig? {
         return try {
-           return cn.lemwoodfrp.utils.ConfigManager.getAllConfigs(this).find { config: cn.lemwoodfrp.utils.FRPConfig -> config.id == configId }
+           cn.lemwoodfrp.utils.ConfigManager.getAllConfigs(this).find { config: cn.lemwoodfrp.utils.FRPConfig -> config.id == configId }
         } catch (e: Exception) {
             LogManager.e(TAG, "获取配置失败: ${e.message}")
             null
