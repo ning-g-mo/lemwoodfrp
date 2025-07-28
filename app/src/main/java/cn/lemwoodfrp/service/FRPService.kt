@@ -464,7 +464,8 @@ class FRPService : Service() {
                 LogManager.s(TAG, "✅ 找到配置: ${config.name}, 类型: ${config.type}", configId)
                 LogManager.i(TAG, "📋 配置详情:", configId)
                 LogManager.i(TAG, "  - 服务器地址: ${config.serverAddr}:${config.serverPort}", configId)
-                LogManager.i(TAG, "  - 代理类型: ${config.proxyType}", configId)                LogManager.i(TAG, "  - 本地端口: ${config.localPort ?: "未设置"}", configId)
+                LogManager.i(TAG, "  - 代理类型: ${config.proxyType}", configId)
+                LogManager.i(TAG, "  - 本地端口: ${config.localPort ?: "未设置"}", configId)
                 LogManager.i(TAG, "  - 远程端口: ${config.remotePort ?: "未设置"}", configId)
                 
                 // 检查是否已经在运行
@@ -1004,7 +1005,7 @@ class FRPService : Service() {
     }
 
     private fun createNotification(): Notification {
-        val intent = Intent(this, MainActivity::class.java)
+        val intent = Intent(this, cn.lemwoodfrp.ui.MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
