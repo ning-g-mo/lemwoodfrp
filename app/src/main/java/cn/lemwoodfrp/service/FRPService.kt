@@ -46,7 +46,8 @@ class FRPService : Service() {
         LogManager.init(this)
         LogManager.i(TAG, "FRP服务启动 qwq")
         
-        // 初始化FRP二进制文件 qwq
+        // 初始化PRoot和FRP二进制文件 AWA
+        initializePRootBinaries()
         initializeFRPBinaries()
         startForeground(NOTIFICATION_ID, createNotification())
     }
@@ -69,6 +70,109 @@ class FRPService : Service() {
             }
         }
         return START_STICKY
+    }
+    
+    /**
+     * 初始化PRoot二进制文件 qwq
+     * PRoot用于在Android上提供更好的Linux环境兼容性
+     */
+    private fun initializePRootBinaries() {
+        try {
+            LogManager.i(TAG, "开始初始化PRoot二进制文件 AWA")
+            LogManager.d(TAG, "系统架构信息: ${Build.SUPPORTED_ABIS.joinToString()}")
+            
+            // 检测设备架构
+            val deviceAbi = getDeviceAbi()
+            LogManager.i(TAG, "检测到设备架构: $deviceAbi")
+            
+            val prootDir = File(filesDir, "proot")
+            LogManager.d(TAG, "PRoot目录路径: ${prootDir.absolutePath}")
+            
+            if (!prootDir.exists()) {
+                LogManager.d(TAG, "PRoot目录不存在，正在创建...")
+                val created = prootDir.mkdirs()
+                LogManager.d(TAG, "目录创建结果: $created")
+                if (!created) {
+                    LogManager.e(TAG, "无法创建PRoot目录")
+                    return
+                }
+            } else {
+                LogManager.d(TAG, "PRoot目录已存在")
+            }
+            
+            // 复制PRoot二进制文件
+            val prootFile = File(prootDir, "proot")
+            LogManager.d(TAG, "开始处理PRoot文件: ${prootFile.absolutePath}")
+            
+            if (prootFile.exists()) {
+                LogManager.d(TAG, "PRoot文件已存在，大小: ${prootFile.length()} bytes")
+                // 检查现有文件是否有效
+                try {
+                    val existingHeader = prootFile.readBytes().take(4)
+                    val elfMagic = byteArrayOf(0x7F, 0x45, 0x4C, 0x46)
+                    val isValidELF = existingHeader.zip(elfMagic.toList()).all { it.first == it.second }
+                    LogManager.d(TAG, "现有PRoot文件格式检查 - ELF格式: $isValidELF")
+                    
+                    if (!isValidELF) {
+                        LogManager.w(TAG, "现有PRoot文件格式无效，将重新复制")
+                        prootFile.delete()
+                    }
+                } catch (e: Exception) {
+                    LogManager.w(TAG, "检查现有PRoot文件时出错: ${e.message}")
+                    prootFile.delete()
+                }
+            }
+            
+            if (!prootFile.exists()) {
+                LogManager.d(TAG, "从assets复制PRoot文件...")
+                val prootAssetPath = "proot/$deviceAbi/proot"
+                LogManager.d(TAG, "PRoot资源路径: $prootAssetPath")
+                copyAssetToFile(prootAssetPath, prootFile)
+                LogManager.d(TAG, "PRoot复制完成，文件大小: ${prootFile.length()} bytes")
+            }
+            
+            // 设置执行权限
+            LogManager.d(TAG, "设置PRoot权限 - 当前权限: 可读=${prootFile.canRead()}, 可执行=${prootFile.canExecute()}")
+            if (!prootFile.setExecutable(true)) {
+                LogManager.w(TAG, "setExecutable失败，尝试使用chmod设置PRoot权限")
+                try {
+                    val chmodCommand = "chmod 755 ${prootFile.absolutePath}"
+                    LogManager.d(TAG, "执行命令: $chmodCommand")
+                    val chmodProcess = Runtime.getRuntime().exec(chmodCommand)
+                    val exitCode = chmodProcess.waitFor()
+                    LogManager.d(TAG, "chmod PRoot 退出码: $exitCode")
+                    
+                    if (exitCode != 0) {
+                        LogManager.e(TAG, "chmod PRoot 失败，退出码: $exitCode")
+                    }
+                } catch (e: Exception) {
+                    LogManager.w(TAG, "chmod PRoot 失败: ${e.message}")
+                }
+            } else {
+                LogManager.d(TAG, "PRoot setExecutable 成功")
+            }
+            
+            // 验证PRoot文件完整性
+            try {
+                val prootHeader = prootFile.readBytes().take(4)
+                val elfMagic = byteArrayOf(0x7F, 0x45, 0x4C, 0x46)
+                val prootValid = prootHeader.zip(elfMagic.toList()).all { it.first == it.second }
+                
+                LogManager.d(TAG, "PRoot文件完整性验证: $prootValid")
+                
+                if (prootValid) {
+                    LogManager.s(TAG, "PRoot二进制文件初始化完成 qwq")
+                } else {
+                    LogManager.e(TAG, "PRoot二进制文件验证失败")
+                }
+            } catch (e: Exception) {
+                LogManager.w(TAG, "PRoot文件完整性验证时出错: ${e.message}")
+            }
+            
+        } catch (e: Exception) {
+            LogManager.e(TAG, "初始化PRoot二进制文件失败", e)
+            LogManager.e(TAG, "错误详情: ${e.javaClass.simpleName} - ${e.message}")
+        }
     }
     
     /**
@@ -248,8 +352,7 @@ class FRPService : Service() {
             LogManager.e(TAG, "初始化FRP二进制文件失败", e)
             LogManager.e(TAG, "错误详情: ${e.javaClass.simpleName} - ${e.message}")
         }
-    }
-    
+    }    
     /**
      * 从assets复制文件到目标位置
      */
@@ -303,13 +406,133 @@ class FRPService : Service() {
     }
     
     /**
+     * 使用PRoot启动FRP进程 AWA
+     * PRoot提供更好的Linux环境兼容性
+     */
+    private fun startFRPWithPRoot(configId: String, config: FRPConfig): Process? {
+        try {
+            LogManager.i(TAG, "🐧 使用PRoot启动FRP进程", configId)
+            
+            val prootDir = File(filesDir, "proot")
+            val prootFile = File(prootDir, "proot")
+            val frpDir = File(filesDir, "frp")
+            val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
+            val executableFile = File(frpDir, executable)
+            
+            // 检查PRoot是否可用
+            if (!prootFile.exists() || !prootFile.canExecute()) {
+                LogManager.w(TAG, "PRoot不可用，回退到直接执行", configId)
+                return startFRPDirect(configId, config)
+            }
+            
+            // 创建配置文件
+            val configFile = createConfigFile(config)
+            if (configFile == null) {
+                LogManager.e(TAG, "创建配置文件失败", configId = configId)
+                return null
+            }
+            
+            LogManager.i(TAG, "📝 配置文件创建成功: ${configFile.absolutePath}", configId)
+            
+            // 构建PRoot命令 qwq
+            val command = mutableListOf<String>().apply {
+                add(prootFile.absolutePath)
+                add("--rootfs=/")  // 使用根文件系统
+                add("--bind=${frpDir.absolutePath}:/frp")  // 绑定FRP目录
+                add("--bind=${configFile.parent}:/config")  // 绑定配置目录
+                add("--cwd=/frp")  // 设置工作目录
+                add("/frp/$executable")  // FRP可执行文件
+                add("-c")
+                add("/config/${configFile.name}")  // 配置文件路径
+            }
+            
+            LogManager.i(TAG, "🚀 PRoot命令构建完成:", configId)
+            LogManager.i(TAG, "命令: ${command.joinToString(" ")}", configId)
+            
+            // 设置环境变量
+            val processBuilder = ProcessBuilder(command)
+            processBuilder.directory(frpDir)
+            processBuilder.redirectErrorStream(true)
+            
+            // 添加必要的环境变量 AWA
+            val env = processBuilder.environment()
+            env["PATH"] = "/system/bin:/system/xbin:/vendor/bin"
+            env["LD_LIBRARY_PATH"] = "/system/lib:/system/lib64:/vendor/lib:/vendor/lib64"
+            env["TMPDIR"] = cacheDir.absolutePath
+            
+            LogManager.i(TAG, "🌍 环境变量设置完成", configId)
+            LogManager.d(TAG, "PATH: ${env["PATH"]}", configId)
+            LogManager.d(TAG, "LD_LIBRARY_PATH: ${env["LD_LIBRARY_PATH"]}", configId)
+            LogManager.d(TAG, "TMPDIR: ${env["TMPDIR"]}", configId)
+            
+            // 启动进程
+            LogManager.i(TAG, "▶️ 启动PRoot进程...", configId)
+            val process = processBuilder.start()
+            
+            LogManager.s(TAG, "✅ PRoot进程启动成功 qwq", configId)
+            return process
+            
+        } catch (e: Exception) {
+            LogManager.e(TAG, "PRoot启动失败，回退到直接执行: ${e.message}", configId = configId)
+            return startFRPDirect(configId, config)
+        }
+    }
+    
+    /**
+     * 直接启动FRP进程（不使用PRoot）
+     */
+    private fun startFRPDirect(configId: String, config: FRPConfig): Process? {
+        try {
+            LogManager.i(TAG, "🔧 直接启动FRP进程", configId)
+            
+            val frpDir = File(filesDir, "frp")
+            val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
+            val executableFile = File(frpDir, executable)
+            
+            // 创建配置文件
+            val configFile = createConfigFile(config)
+            if (configFile == null) {
+                LogManager.e(TAG, "创建配置文件失败", configId = configId)
+                return null
+            }
+            
+            LogManager.i(TAG, "📝 配置文件创建成功: ${configFile.absolutePath}", configId)
+            
+            // 构建命令
+            val command = arrayOf(
+                executableFile.absolutePath,
+                "-c",
+                configFile.absolutePath
+            )
+            
+            LogManager.i(TAG, "🚀 直接启动命令:", configId)
+            LogManager.i(TAG, "命令: ${command.joinToString(" ")}", configId)
+            
+            // 启动进程
+            val processBuilder = ProcessBuilder(*command)
+            processBuilder.directory(frpDir)
+            processBuilder.redirectErrorStream(true)
+            
+            LogManager.i(TAG, "▶️ 启动进程...", configId)
+            val process = processBuilder.start()
+            
+            LogManager.s(TAG, "✅ 进程启动成功", configId)
+            return process
+            
+        } catch (e: Exception) {
+            LogManager.e(TAG, "直接启动FRP进程失败: ${e.message}", configId = configId)
+            return null
+        }
+    }
+    
+    /**
      * 启动FRP进程
      */
     fun startFRPProcess(configId: String) {
         serviceScope.launch {
             try {
                 LogManager.i(TAG, "🚀 开始启动FRP进程", configId)
-                LogManager.i(TAG, "=".repeat(60), configId)
+                LogManager.i(TAG, "=" * 60, configId)
                 LogManager.i(TAG, "配置ID: $configId", configId)
                 LogManager.d(TAG, "系统信息 - Android版本: ${Build.VERSION.RELEASE}, API: ${Build.VERSION.SDK_INT}, ABI: ${Build.SUPPORTED_ABIS.joinToString()}", configId)
                 
@@ -333,7 +556,7 @@ class FRPService : Service() {
                 if (config.subdomain.isNotEmpty()) {
                     LogManager.i(TAG, "  - 子域名: ${config.subdomain}", configId)
                 }
-                LogManager.i(TAG, "-".repeat(40), configId)
+                LogManager.i(TAG, "-" * 40, configId)
                 
                 if (runningProcesses.containsKey(configId)) {
                     LogManager.w(TAG, "⚠️ 进程已在运行中，跳过启动", configId)
@@ -394,613 +617,299 @@ class FRPService : Service() {
                 // 检查文件头，确认是否为有效的ELF文件
                 LogManager.i(TAG, "🔍 ELF文件格式验证:", configId)
                 try {
-                    val fileHeader = executableFile.readBytes().take(4)
+                    val fileHeader = executableFile.readBytes().take(16)
                     val elfMagic = byteArrayOf(0x7F, 0x45, 0x4C, 0x46) // ELF magic number
-                    val isELF = fileHeader.zip(elfMagic.toList()).all { it.first == it.second }
-                    val headerHex = fileHeader.joinToString(" ") { "0x%02X".format(it) }
+                    val isELF = fileHeader.take(4).zip(elfMagic.toList()).all { it.first == it.second }
                     
-                    LogManager.i(TAG, "  - 文件头: $headerHex", configId)
-                    LogManager.i(TAG, "  - ELF魔数: ${elfMagic.joinToString(" ") { "0x%02X".format(it) }}", configId)
-                    LogManager.i(TAG, "  - 格式验证: ${if (isELF) "✅ 有效的ELF文件" else "❌ 无效的ELF文件"}", configId)
+                    LogManager.i(TAG, "  - ELF格式: $isELF", configId)
+                    LogManager.d(TAG, "  - 文件头: ${fileHeader.joinToString(" ") { "0x%02X".format(it) }}", configId)
                     
                     if (!isELF) {
-                        LogManager.e(TAG, "❌ 文件不是有效的ELF可执行文件!", configId = configId)
-                        LogManager.e(TAG, "💡 可能的原因:", configId = configId)
-                        LogManager.e(TAG, "  1. 文件损坏或不完整", configId = configId)
-                        LogManager.e(TAG, "  2. 文件不是为Android平台编译的", configId = configId)
-                        LogManager.e(TAG, "  3. 下载或复制过程中出现错误", configId = configId)
+                        LogManager.e(TAG, "❌ 文件不是有效的ELF格式!", configId = configId)
+                        LogManager.e(TAG, "  - 预期文件头: 0x7F 0x45 0x4C 0x46 (ELF)", configId = configId)
+                        LogManager.e(TAG, "  - 实际文件头: ${fileHeader.take(4).joinToString(" ") { "0x%02X".format(it) }}", configId = configId)
                         return@launch
                     }
                     
-                    LogManager.s(TAG, "✅ ELF文件格式验证通过", configId)
+                    LogManager.s(TAG, "✅ ELF格式验证通过", configId)
+                    
                 } catch (e: Exception) {
-                    LogManager.w(TAG, "⚠️ 无法读取文件头进行验证: ${e.message}", configId)
-                    LogManager.w(TAG, "继续执行，但可能存在文件问题", configId)
+                    LogManager.w(TAG, "文件头读取失败: ${e.message}", configId)
                 }
                 
-                // 权限检查和设置 qwq
-                LogManager.i(TAG, "🔐 权限检查和设置:", configId)
-                if (!executableFile.canExecute()) {
-                    LogManager.w(TAG, "⚠️ 文件没有执行权限，开始设置权限...", configId)
-                    
-                    // 尝试使用Java API设置权限
-                    LogManager.i(TAG, "  - 尝试使用setExecutable()方法", configId)
-                    val setExecutableResult = executableFile.setExecutable(true)
-                    LogManager.i(TAG, "  - setExecutable()结果: $setExecutableResult", configId)
-                    
-                    if (!setExecutableResult) {
-                        LogManager.w(TAG, "  - Java API设置权限失败，尝试chmod命令", configId)
-                        // 尝试使用chmod作为备用方案 qwq
-                        try {
-                            val chmodCommand = "chmod 755 ${executableFile.absolutePath}"
-                            LogManager.i(TAG, "  - 执行命令: $chmodCommand", configId)
-                            
-                            val chmodProcess = Runtime.getRuntime().exec(chmodCommand)
-                            val exitCode = chmodProcess.waitFor()
-                            
-                            // 读取命令输出
-                            val output = chmodProcess.inputStream.bufferedReader().readText()
-                            val errorOutput = chmodProcess.errorStream.bufferedReader().readText()
-                            
-                            LogManager.i(TAG, "  - chmod退出码: $exitCode", configId)
-                            if (output.isNotEmpty()) {
-                                LogManager.i(TAG, "  - chmod输出: $output", configId)
-                            }
-                            if (errorOutput.isNotEmpty()) {
-                                LogManager.w(TAG, "  - chmod错误输出: $errorOutput", configId)
-                            }
-                            
-                            if (exitCode != 0) {
-                                LogManager.e(TAG, "❌ chmod执行失败，退出码: $exitCode", configId = configId)
-                                LogManager.e(TAG, "💡 可能的解决方案:", configId = configId)
-                                LogManager.e(TAG, "  1. 设备不支持chmod命令", configId = configId)
-                                LogManager.e(TAG, "  2. 文件系统不支持执行权限", configId = configId)
-                                LogManager.e(TAG, "  3. SELinux策略限制", configId = configId)
-                                return@launch
-                            }
-                            
-                            LogManager.s(TAG, "✅ chmod命令执行成功", configId)
-                        } catch (e: Exception) {
-                            LogManager.e(TAG, "❌ chmod命令执行异常: ${e.message}", configId = configId)
-                            LogManager.e(TAG, "异常类型: ${e.javaClass.simpleName}", configId = configId)
-                            return@launch
-                        }
-                    } else {
-                        LogManager.s(TAG, "✅ Java API设置权限成功", configId)
-                    }
-                } else {
-                    LogManager.s(TAG, "✅ 文件已具有执行权限", configId)
-                }
+                // 尝试使用PRoot启动，如果失败则回退到直接启动 qwq
+                LogManager.i(TAG, "🐧 尝试使用PRoot启动FRP进程...", configId)
+                val process = startFRPWithPRoot(configId, config)
                 
-                // 再次检查权限 AWA
-                LogManager.i(TAG, "🔄 最终权限验证:", configId)
-                LogManager.i(TAG, "  - 可读权限: ${executableFile.canRead()}", configId)
-                LogManager.i(TAG, "  - 可执行权限: ${executableFile.canExecute()}", configId)
-                
-                if (!executableFile.canExecute()) {
-                    LogManager.e(TAG, "❌ 最终权限验证失败，文件仍无执行权限", configId = configId)
+                if (process == null) {
+                    LogManager.e(TAG, "❌ 进程启动失败", configId = configId)
                     return@launch
                 }
                 
-                LogManager.s(TAG, "✅ 所有文件检查通过，开始创建配置文件", configId)
-                
-                // 配置文件创建 qwq
-                LogManager.i(TAG, "📝 创建配置文件:", configId)
-                val configFile = createConfigFile(config)
-                LogManager.i(TAG, "  - 配置文件路径: ${configFile.absolutePath}", configId)
-                LogManager.i(TAG, "  - 配置文件存在: ${configFile.exists()}", configId)
-                LogManager.i(TAG, "  - 配置文件大小: ${configFile.length()} bytes", configId)
-                
-                // 显示配置文件内容（前几行）用于调试
-                try {
-                    val configContent = configFile.readText()
-                    val lines = configContent.lines()
-                    LogManager.i(TAG, "  - 配置文件内容预览 (前5行):", configId)
-                    lines.take(5).forEachIndexed { index, line ->
-                        LogManager.i(TAG, "    ${index + 1}: $line", configId)
-                    }
-                    if (lines.size > 5) {
-                        LogManager.i(TAG, "    ... (共${lines.size}行)", configId)
-                    }
-                } catch (e: Exception) {
-                    LogManager.w(TAG, "  - 无法读取配置文件内容: ${e.message}", configId)
-                }
-                
-                // 命令构建 AWA
-                LogManager.i(TAG, "⚙️ 构建启动命令:", configId)
-                val command = buildFRPCommand(config, configFile)
-                
-                LogManager.i(TAG, "  - 完整命令: ${command.joinToString(" ")}", configId)
-                LogManager.i(TAG, "  - 命令组件:", configId)
-                command.forEachIndexed { index, part ->
-                    LogManager.i(TAG, "    [$index]: $part", configId)
-                }
-                
-                val workingDir = File(filesDir, "frp")
-                LogManager.i(TAG, "  - 工作目录: ${workingDir.absolutePath}", configId)
-                LogManager.i(TAG, "  - 工作目录存在: ${workingDir.exists()}", configId)
-                
-                val processBuilder = ProcessBuilder(command)
-                processBuilder.directory(workingDir)
-                
-                // 设置环境变量，确保在Android环境下正确执行 qwq
-                LogManager.i(TAG, "🌍 环境变量配置:", configId)
-                val env = processBuilder.environment()
-                val originalPath = env["PATH"] ?: ""
-                val newPath = "${workingDir.absolutePath}:$originalPath"
-                env["PATH"] = newPath
-                env["LD_LIBRARY_PATH"] = workingDir.absolutePath
-                
-                LogManager.i(TAG, "  - 原始PATH: $originalPath", configId)
-                LogManager.i(TAG, "  - 新PATH: $newPath", configId)
-                LogManager.i(TAG, "  - LD_LIBRARY_PATH: ${env["LD_LIBRARY_PATH"]}", configId)
-                
-                // 显示所有相关环境变量
-                val relevantEnvVars = listOf("PATH", "LD_LIBRARY_PATH", "ANDROID_ROOT", "ANDROID_DATA")
-                LogManager.i(TAG, "  - 相关环境变量:", configId)
-                relevantEnvVars.forEach { varName ->
-                    val value = env[varName] ?: "未设置"
-                    LogManager.i(TAG, "    $varName = $value", configId)
-                }
-                
-                // 重定向错误输出到标准输出，便于日志记录
-                processBuilder.redirectErrorStream(true)
-                LogManager.i(TAG, "  - 错误输出重定向: 已启用", configId)
-                
-                LogManager.i(TAG, "🚀 启动进程...", configId)
-                LogManager.i(TAG, "=".repeat(50), configId)
-                
-                // 尝试启动进程并捕获详细错误信息
-                val process = try {
-                    val startTime = System.currentTimeMillis()
-                    val result = processBuilder.start()
-                    val endTime = System.currentTimeMillis()
-                    
-                    LogManager.s(TAG, "✅ 进程启动成功!", configId)
-                    LogManager.i(TAG, "  - 启动耗时: ${endTime - startTime}ms", configId)
-                    LogManager.i(TAG, "  - 进程对象: ${result.javaClass.simpleName}", configId)
-                    
-                    result
-                } catch (e: Exception) {
-                    LogManager.e(TAG, "❌ 进程启动失败!", configId = configId)
-                    LogManager.e(TAG, "异常类型: ${e.javaClass.simpleName}", configId = configId)
-                    LogManager.e(TAG, "异常消息: ${e.message}", configId = configId)
-                    LogManager.e(TAG, "💡 可能的原因:", configId = configId)
-                    LogManager.e(TAG, "  1. 二进制文件不兼容当前设备架构 (${Build.SUPPORTED_ABIS.joinToString()})", configId = configId)
-                    LogManager.e(TAG, "  2. 权限不足或SELinux策略限制", configId = configId)
-                    LogManager.e(TAG, "  3. 依赖库缺失或版本不匹配", configId = configId)
-                    LogManager.e(TAG, "  4. 系统资源不足", configId = configId)
-                    LogManager.e(TAG, "  5. 配置文件格式错误", configId = configId)
-                    
-                    // 显示异常堆栈的前几行
-                    val stackTrace = e.stackTrace.take(3)
-                    if (stackTrace.isNotEmpty()) {
-                        LogManager.e(TAG, "堆栈跟踪:", configId = configId)
-                        stackTrace.forEach { element ->
-                            LogManager.e(TAG, "  at $element", configId = configId)
-                        }
-                    }
-                    
-                    return@launch
-                }
-                
+                // 保存进程引用
                 runningProcesses[configId] = process
+                processStatus[configId] = FRPStatus.RUNNING
                 
-                LogManager.i(TAG, "📊 更新进程状态...", configId)
-                val startTime = System.currentTimeMillis()
-                val pid = getPid(process)
+                LogManager.s(TAG, "🎉 FRP进程启动成功! qwq", configId)
+                LogManager.i(TAG, "进程PID: ${getPid(process)}", configId)
+                LogManager.i(TAG, "当前运行的进程数量: ${runningProcesses.size}", configId)
                 
-                val status = FRPStatus(
-                    configId = configId,
-                    isRunning = true,
-                    pid = pid,
-                    startTime = startTime
-                )
-                processStatus[configId] = status
-                
-                LogManager.s(TAG, "✅ FRP进程启动成功!", configId)
-                LogManager.i(TAG, "  - 配置ID: $configId", configId)
-                LogManager.i(TAG, "  - 进程PID: $pid", configId)
-                LogManager.i(TAG, "  - 启动时间: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.getDefault()).format(java.util.Date(startTime))}", configId)
-                LogManager.i(TAG, "  - 进程状态: 运行中 ✨", configId)
-                
-                // 显示当前所有运行的进程
-                val allRunning = runningProcesses.keys
-                LogManager.i(TAG, "🔄 当前运行的配置数量: ${allRunning.size}", configId)
-                if (allRunning.isNotEmpty()) {
-                    LogManager.i(TAG, "  - 运行中的配置: ${allRunning.joinToString(", ")}", configId)
-                }
-                
-                LogManager.i(TAG, "🔍 开始进程监控...", configId)
-                LogManager.i(TAG, "=".repeat(50), configId)
-                
-                // 监控进程状态和输出
-                monitorProcess(configId, process)
+                // 监控进程输出 AWA
+                monitorProcessOutput(configId, process)
                 
             } catch (e: Exception) {
-                LogManager.e(TAG, "启动FRP进程失败", e, configId)
-                LogManager.e(TAG, "详细错误信息: ${e.javaClass.simpleName} - ${e.message}", configId = configId)
-                LogManager.e(TAG, "堆栈跟踪: ${e.stackTrace.take(5).joinToString("\n") { "  at $it" }}", configId = configId)
-                val status = FRPStatus(
-                    configId = configId,
-                    isRunning = false,
-                    errorMessage = e.message
-                )
-                processStatus[configId] = status
+                LogManager.e(TAG, "启动FRP进程时发生异常", e, configId)
+                processStatus[configId] = FRPStatus.ERROR
             }
         }
     }    
     /**
+     * 创建FRP配置文件 qwq
+     */
+    private fun createConfigFile(config: FRPConfig): File? {
+        try {
+            val configDir = File(filesDir, "configs")
+            if (!configDir.exists()) {
+                configDir.mkdirs()
+            }
+            
+            val configFile = File(configDir, "${config.id}.ini")
+            val configContent = buildString {
+                appendLine("[common]")
+                appendLine("server_addr = ${config.serverAddr}")
+                appendLine("server_port = ${config.serverPort}")
+                
+                if (config.token.isNotEmpty()) {
+                    appendLine("token = ${config.token}")
+                }
+                
+                appendLine()
+                appendLine("[${config.name}]")
+                appendLine("type = ${config.proxyType}")
+                appendLine("local_ip = 127.0.0.1")
+                appendLine("local_port = ${config.localPort}")
+                
+                when (config.proxyType.lowercase()) {
+                    "tcp", "udp" -> {
+                        appendLine("remote_port = ${config.remotePort}")
+                    }
+                    "http", "https" -> {
+                        if (config.customDomain.isNotEmpty()) {
+                            appendLine("custom_domains = ${config.customDomain}")
+                        }
+                        if (config.subdomain.isNotEmpty()) {
+                            appendLine("subdomain = ${config.subdomain}")
+                        }
+                    }
+                }
+            }
+            
+            configFile.writeText(configContent)
+            LogManager.d(TAG, "配置文件内容:\\n$configContent")
+            
+            return configFile
+            
+        } catch (e: Exception) {
+            LogManager.e(TAG, "创建配置文件失败: ${e.message}")
+            return null
+        }
+    }
+    
+    /**
+     * 监控进程输出 AWA
+     */
+    private fun monitorProcessOutput(configId: String, process: Process) {
+        serviceScope.launch {
+            try {
+                val reader = BufferedReader(InputStreamReader(process.inputStream))
+                var line: String?
+                
+                LogManager.i(TAG, "📡 开始监控进程输出", configId)
+                
+                while (reader.readLine().also { line = it } != null && runningProcesses.containsKey(configId)) {
+                    line?.let { output ->
+                        LogManager.i(TAG, "[FRP输出] $output", configId)
+                        
+                        // 检查启动成功的标志 qwq
+                        if (output.contains("start frpc success") || 
+                            output.contains("start frps success") ||
+                            output.contains("login to server success")) {
+                            LogManager.s(TAG, "🎉 FRP启动成功!", configId)
+                            processStatus[configId] = FRPStatus.RUNNING
+                        }
+                        
+                        // 检查错误信息
+                        if (output.contains("error") || output.contains("failed")) {
+                            LogManager.w(TAG, "⚠️ 检测到错误信息: $output", configId)
+                        }
+                    }
+                }
+                
+                LogManager.i(TAG, "📡 进程输出监控结束", configId)
+                
+            } catch (e: Exception) {
+                LogManager.w(TAG, "监控进程输出时出错: ${e.message}", configId)
+            }
+        }
+        
+        // 监控进程状态
+        serviceScope.launch {
+            try {
+                val exitCode = process.waitFor()
+                LogManager.i(TAG, "🔚 进程结束，退出码: $exitCode", configId)
+                
+                runningProcesses.remove(configId)
+                processStatus[configId] = if (exitCode == 0) FRPStatus.STOPPED else FRPStatus.ERROR
+                
+                LogManager.i(TAG, "当前运行的进程数量: ${runningProcesses.size}", configId)
+                
+            } catch (e: Exception) {
+                LogManager.w(TAG, "监控进程状态时出错: ${e.message}", configId)
+            }
+        }
+    }
+    
+    /**
      * 停止FRP进程
      */
     fun stopFRPProcess(configId: String) {
-        runningProcesses[configId]?.let { process ->
+        serviceScope.launch {
             try {
-                LogManager.i(TAG, "停止FRP进程", configId)
+                LogManager.i(TAG, "🛑 停止FRP进程", configId)
                 
-                process.destroy()
+                val process = runningProcesses[configId]
+                if (process == null) {
+                    LogManager.w(TAG, "进程不存在或已停止", configId)
+                    processStatus[configId] = FRPStatus.STOPPED
+                    return@launch
+                }
+                
+                LogManager.i(TAG, "正在终止进程...", configId)
+                
+                // 尝试优雅关闭
+                try {
+                    process.destroy()
+                    
+                    // 等待进程结束，最多等待5秒
+                    val terminated = withTimeoutOrNull(5000) {
+                        process.waitFor()
+                        true
+                    }
+                    
+                    if (terminated == true) {
+                        LogManager.s(TAG, "✅ 进程已优雅关闭", configId)
+                    } else {
+                        LogManager.w(TAG, "进程未在5秒内关闭，强制终止", configId)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            process.destroyForcibly()
+                        }
+                    }
+                    
+                } catch (e: Exception) {
+                    LogManager.w(TAG, "终止进程时出错: ${e.message}", configId)
+                }
+                
                 runningProcesses.remove(configId)
-                processStatus[configId] = FRPStatus(
-                    configId = configId,
-                    isRunning = false
-                )
+                processStatus[configId] = FRPStatus.STOPPED
                 
-                LogManager.s(TAG, "FRP进程已停止", configId)
+                LogManager.s(TAG, "🎯 FRP进程已停止", configId)
+                LogManager.i(TAG, "当前运行的进程数量: ${runningProcesses.size}", configId)
                 
             } catch (e: Exception) {
-                LogManager.w(TAG, "正常停止失败，尝试强制停止", configId = configId)
-                
-                // 强制杀死进程 qwq
-                try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        process.destroyForcibly()
-                    } else {
-                        process.destroy()
-                    }
-                    runningProcesses.remove(configId)
-                    LogManager.s(TAG, "FRP进程强制停止成功", configId)
-                } catch (ex: Exception) {
-                    LogManager.e(TAG, "强制停止进程失败", ex, configId)
-                }
+                LogManager.e(TAG, "停止FRP进程时发生异常", e, configId)
             }
-        } ?: run {
-            LogManager.w(TAG, "进程不存在或已停止", configId)
+        }
+    }
+    
+    /**
+     * 获取配置信息
+     */
+    private fun getConfigById(configId: String): FRPConfig? {
+        return try {
+            ConfigManager.getAllConfigs(this).find { it.id == configId }
+        } catch (e: Exception) {
+            LogManager.e(TAG, "获取配置失败: ${e.message}")
+            null
         }
     }
     
     /**
      * 获取进程状态
      */
-    fun getProcessStatus(configId: String): FRPStatus? {
-        return processStatus[configId]
+    fun getProcessStatus(configId: String): FRPStatus {
+        return processStatus[configId] ?: FRPStatus.STOPPED
     }
     
     /**
      * 获取所有运行中的进程
      */
-    fun getAllRunningProcesses(): Map<String, FRPStatus> {
-        return processStatus.filter { it.value.isRunning }
+    fun getRunningProcesses(): Map<String, FRPStatus> {
+        return processStatus.toMap()
     }
     
     /**
-     * 监控进程状态
+     * 停止所有进程
      */
-    private fun monitorProcess(configId: String, process: Process) {
-        serviceScope.launch {
-            try {
-                LogManager.i(TAG, "🔍 进程监控启动", configId)
-                LogManager.i(TAG, "  - 监控线程: ${Thread.currentThread().name}", configId)
-                LogManager.i(TAG, "  - 配置ID: $configId", configId)
-                LogManager.i(TAG, "  - 进程对象: ${process.javaClass.simpleName}", configId)
-                
-                // 检查进程初始状态
-                val isAlive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    process.isAlive
-                } else {
-                    try {
-                        process.exitValue()
-                        false
-                    } catch (e: IllegalThreadStateException) {
-                        true
-                    }
-                }
-                
-                LogManager.i(TAG, "  - 进程初始状态: ${if (isAlive) "存活 ✅" else "已退出 ❌"}", configId)
-                
-                if (!isAlive) {
-                    LogManager.w(TAG, "⚠️ 进程在监控开始前就已退出!", configId)
-                    val exitCode = try {
-                        process.exitValue()
-                    } catch (e: Exception) {
-                        -1
-                    }
-                    LogManager.w(TAG, "  - 退出码: $exitCode", configId)
-                }
-                
-                // 读取进程输出
-                LogManager.i(TAG, "📖 开始读取进程输出...", configId)
-                val reader = BufferedReader(InputStreamReader(process.inputStream))
-                var line: String?
-                var outputLineCount = 0
-                val maxOutputLines = 100 // 限制输出行数，避免日志过多 qwq
-                val startReadTime = System.currentTimeMillis()
-                
-                LogManager.i(TAG, "  - 最大输出行数限制: $maxOutputLines", configId)
-                LogManager.i(TAG, "  - 开始读取时间: ${java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault()).format(java.util.Date(startReadTime))}", configId)
-                
-                while (reader.readLine().also { line = it } != null && outputLineCount < maxOutputLines) {
-                    line?.let { 
-                        outputLineCount++
-                        LogManager.d(TAG, "📄 FRP输出[$outputLineCount]: $it", configId)
-                        
-                        // 检查特定的错误模式 AWA
-                        when {
-                            it.contains("error", ignoreCase = true) -> {
-                                LogManager.e(TAG, "❌ FRP错误输出[$outputLineCount]: $it", configId = configId)
-                            }
-                            it.contains("failed", ignoreCase = true) -> {
-                                LogManager.e(TAG, "💥 FRP失败输出[$outputLineCount]: $it", configId = configId)
-                            }
-                            it.contains("warning", ignoreCase = true) -> {
-                                LogManager.w(TAG, "⚠️ FRP警告输出[$outputLineCount]: $it", configId)
-                            }
-                            it.contains("success", ignoreCase = true) || it.contains("start", ignoreCase = true) -> {
-                                LogManager.s(TAG, "✅ FRP成功输出[$outputLineCount]: $it", configId)
-                            }
-                            it.contains("connect", ignoreCase = true) -> {
-                                LogManager.i(TAG, "🔗 FRP连接输出[$outputLineCount]: $it", configId)
-                            }
-                            it.contains("proxy", ignoreCase = true) -> {
-                                LogManager.i(TAG, "🌐 FRP代理输出[$outputLineCount]: $it", configId)
-                            }
-                        }
-                    }
-                }
-                
-                val endReadTime = System.currentTimeMillis()
-                LogManager.i(TAG, "📖 输出读取完成", configId)
-                LogManager.i(TAG, "  - 总输出行数: $outputLineCount", configId)
-                LogManager.i(TAG, "  - 读取耗时: ${endReadTime - startReadTime}ms", configId)
-                
-                if (outputLineCount >= maxOutputLines) {
-                    LogManager.w(TAG, "⚠️ 输出行数达到限制($maxOutputLines)，停止记录更多输出", configId)
-                }
-                
-                // 等待进程结束
-                LogManager.i(TAG, "⏳ 等待进程结束...", configId)
-                val waitStartTime = System.currentTimeMillis()
-                val exitCode = process.waitFor()
-                val waitEndTime = System.currentTimeMillis()
-                
-                LogManager.i(TAG, "🏁 进程已结束", configId)
-                LogManager.i(TAG, "  - 退出码: $exitCode", configId)
-                LogManager.i(TAG, "  - 等待耗时: ${waitEndTime - waitStartTime}ms", configId)
-                
-                // 分析退出码 qwq
-                when (exitCode) {
-                    0 -> LogManager.s(TAG, "✅ 进程正常退出", configId)
-                    1 -> LogManager.e(TAG, "❌ 进程异常退出 - 一般错误", configId = configId)
-                    2 -> LogManager.e(TAG, "❌ 进程异常退出 - 配置错误", configId = configId)
-                    126 -> LogManager.e(TAG, "❌ 进程异常退出 - 权限不足或文件不可执行", configId = configId)
-                    127 -> LogManager.e(TAG, "❌ 进程异常退出 - 命令未找到", configId = configId)
-                    128 -> LogManager.e(TAG, "❌ 进程异常退出 - 无效的退出参数", configId = configId)
-                    else -> {
-                        if (exitCode > 128) {
-                            val signal = exitCode - 128
-                            LogManager.e(TAG, "💀 进程被信号终止 - 信号: $signal", configId = configId)
-                        } else {
-                            LogManager.e(TAG, "❓ 进程异常退出 - 未知错误码: $exitCode", configId = configId)
-                        }
-                    }
-                }
-                
-                // 更新状态
-                LogManager.i(TAG, "🔄 更新进程状态为已停止...", configId)
-                runningProcesses.remove(configId)
-                val status = processStatus[configId]?.copy(
-                    isRunning = false
-                ) ?: FRPStatus(
-                    configId = configId,
-                    isRunning = false
-                )
-                processStatus[configId] = status
-                
-                LogManager.i(TAG, "✅ 进程监控结束", configId)
-                LogManager.i(TAG, "  - 最终状态: 已停止", configId)
-                LogManager.i(TAG, "  - 剩余运行进程: ${runningProcesses.size}", configId)
-                
-            } catch (e: Exception) {
-                LogManager.e(TAG, "💥 监控进程时发生异常!", configId = configId)
-                LogManager.e(TAG, "  - 异常类型: ${e.javaClass.simpleName}", configId = configId)
-                LogManager.e(TAG, "  - 异常消息: ${e.message}", configId = configId)
-                
-                // 显示异常堆栈的前几行
-                val stackTrace = e.stackTrace.take(3)
-                if (stackTrace.isNotEmpty()) {
-                    LogManager.e(TAG, "  - 堆栈跟踪:", configId = configId)
-                    stackTrace.forEach { element ->
-                        LogManager.e(TAG, "    at $element", configId = configId)
-                    }
-                }
-                
-                // 清理状态
-                LogManager.i(TAG, "🧹 清理异常状态...", configId)
-                runningProcesses.remove(configId)
-                val status = processStatus[configId]?.copy(
-                    isRunning = false,
-                    errorMessage = e.message
-                ) ?: FRPStatus(
-                    configId = configId,
-                    isRunning = false,
-                    errorMessage = e.message
-                )
-                processStatus[configId] = status
-                
-                LogManager.i(TAG, "✅ 异常状态清理完成", configId)
-            }
-        }
-    }
-    
-    private fun getConfigById(configId: String): FRPConfig? {
-        // 从ConfigManager获取配置 AWA
-        return ConfigManager.getAllConfigs(this).find { it.id == configId }
-    }
-    
-    private fun createConfigFile(config: FRPConfig): File {
-        val configDir = File(filesDir, "frp/configs")
-        if (!configDir.exists()) {
-            configDir.mkdirs()
-            LogManager.d(TAG, "创建配置目录: ${configDir.absolutePath}", config.id)
+    fun stopAllProcesses() {
+        LogManager.i(TAG, "🛑 停止所有FRP进程")
+        
+        val configIds = runningProcesses.keys.toList()
+        configIds.forEach { configId ->
+            stopFRPProcess(configId)
         }
         
-        val configFile = File(configDir, "${config.id}.toml")
-        
-        // 根据配置类型生成TOML配置文件内容 喵～
-        val configContent = when (config.type) {
-            FRPType.CLIENT -> generateClientConfig(config)
-            FRPType.SERVER -> generateServerConfig(config)
-        }
-        
-        LogManager.d(TAG, "生成的配置文件内容:\n$configContent", config.id)
-        
-        configFile.writeText(configContent)
-        LogManager.d(TAG, "配置文件已生成: ${configFile.absolutePath}", config.id)
-        
-        return configFile
+        LogManager.i(TAG, "已发送停止信号给 ${configIds.size} 个进程")
     }
     
     /**
-     * 生成客户端配置文件内容
+     * 获取进程PID AWA
      */
-    private fun generateClientConfig(config: FRPConfig): String {
-        val configBuilder = StringBuilder()
-        
-        // 基本服务器配置
-        configBuilder.appendLine("serverAddr = \"${config.serverAddr}\"")
-        configBuilder.appendLine("serverPort = ${config.serverPort}")
-        
-        // Token认证 qwq
-        if (!config.token.isNullOrBlank()) {
-            configBuilder.appendLine("auth.token = \"${config.token}\"")
-            LogManager.d(TAG, "客户端配置包含Token认证", config.id)
-        }
-        
-        configBuilder.appendLine()
-        
-        // 代理配置
-        configBuilder.appendLine("[[proxies]]")
-        configBuilder.appendLine("name = \"${config.name}\"")
-        configBuilder.appendLine("type = \"${config.proxyType}\"")
-        
-        if (!config.localIP.isNullOrBlank()) {
-            configBuilder.appendLine("localIP = \"${config.localIP}\"")
-        }
-        
-        config.localPort?.let {
-            configBuilder.appendLine("localPort = $it")
-        }
-        
-        config.remotePort?.let {
-            configBuilder.appendLine("remotePort = $it")
-        }
-        
-        return configBuilder.toString()
-    }
-    
-    /**
-     * 生成服务端配置文件内容
-     */
-    private fun generateServerConfig(config: FRPConfig): String {
-        val configBuilder = StringBuilder()
-        
-        // 基本绑定配置
-        configBuilder.appendLine("bindPort = ${config.serverPort}")
-        
-        // Token认证 AWA
-        if (!config.token.isNullOrBlank()) {
-            configBuilder.appendLine("auth.token = \"${config.token}\"")
-            LogManager.d(TAG, "服务端配置包含Token认证", config.id)
-        }
-        
-        configBuilder.appendLine()
-        configBuilder.appendLine("# 可选的Web管理界面配置 qwq")
-        configBuilder.appendLine("# webServer.addr = \"0.0.0.0\"")
-        configBuilder.appendLine("# webServer.port = 7500")
-        configBuilder.appendLine("# webServer.user = \"admin\"")
-        configBuilder.appendLine("# webServer.password = \"admin\"")
-        
-        return configBuilder.toString()
-    }
-    
-    private fun buildFRPCommand(config: FRPConfig, configFile: File): List<String> {
-        val frpDir = File(filesDir, "frp")
-        val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
-        val executableFile = File(frpDir, executable)
-        
-        // 在Android环境下，直接执行二进制文件 AWA
-        return listOf(
-            executableFile.absolutePath,
-            "-c",
-            configFile.absolutePath
-        )
-    }
-    
-    private fun getPid(process: Process): Int? {
+    private fun getPid(process: Process): String {
         return try {
-            val field = process.javaClass.getDeclaredField("pid")
-            field.isAccessible = true
-            field.getInt(process)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                process.pid().toString()
+            } else {
+                // API 25及以下的fallback方案
+                val field = process.javaClass.getDeclaredField("pid")
+                field.isAccessible = true
+                field.getInt(process).toString()
+            }
         } catch (e: Exception) {
-            null
+            "未知"
+        }
+    }
+    
+    /**
+     * 检测设备架构 qwq
+     */
+    private fun getDeviceAbi(): String {
+        val supportedAbis = Build.SUPPORTED_ABIS
+        
+        return when {
+            supportedAbis.contains("arm64-v8a") -> "arm64-v8a"
+            supportedAbis.contains("armeabi-v7a") -> "armeabi-v7a"
+            supportedAbis.contains("armeabi") -> "armeabi-v7a" // 向后兼容
+            supportedAbis.contains("x86_64") -> "x86_64"
+            supportedAbis.contains("x86") -> "x86"
+            else -> {
+                LogManager.w(TAG, "未找到匹配的架构，使用默认架构: arm64-v8a")
+                LogManager.w(TAG, "设备支持的架构: ${Build.SUPPORTED_ABIS.joinToString()}")
+                "arm64-v8a"
+            }
         }
     }
     
     override fun onDestroy() {
         super.onDestroy()
-        LogManager.i(TAG, "FRP服务正在关闭...")
+        LogManager.i(TAG, "FRP服务正在销毁 qwq")
         
+        // 停止所有进程
+        stopAllProcesses()
+        
+        // 取消所有协程
         serviceScope.cancel()
         
-        // 停止所有运行中的进程 AWA
-        runningProcesses.values.forEach { process ->
-            try {
-                process.destroy()
-            } catch (e: Exception) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    process.destroyForcibly()
-                } else {
-                    process.destroy()
-                }
-            }
-        }
-        runningProcesses.clear()
-        processStatus.clear()
-        
-        // 保存日志到文件
-        LogManager.saveLogsToFile(this)
-        LogManager.i(TAG, "FRP服务已关闭 qwq")
-    }
-    
-    /**
-     * 获取设备架构 qwq
-     * 根据设备支持的ABI返回对应的架构字符串
-     */
-    private fun getDeviceAbi(): String {
-        // 按优先级检查支持的架构
-        for (abi in Build.SUPPORTED_ABIS) {
-            when (abi) {
-                "arm64-v8a" -> return "arm64-v8a"
-                "armeabi-v7a" -> return "armeabi-v7a"
-                "armeabi" -> return "armeabi-v7a" // 向下兼容
-                "x86_64" -> return "arm64-v8a" // 使用arm64作为fallback
-                "x86" -> return "armeabi-v7a" // 使用arm32作为fallback
-            }
-        }
-        
-        // 如果没有匹配的架构，默认使用arm64-v8a AWA
-        LogManager.w(TAG, "未找到匹配的架构，使用默认架构: arm64-v8a")
-        LogManager.w(TAG, "设备支持的架构: ${Build.SUPPORTED_ABIS.joinToString()}")
-        return "arm64-v8a"
+        LogManager.i(TAG, "FRP服务已销毁 AWA")
     }
     
     /**
@@ -1030,6 +939,46 @@ class FRPService : Service() {
             diagnosis.appendLine("包名: ${packageName}")
             diagnosis.appendLine("私有目录: ${filesDir.absolutePath}")
             diagnosis.appendLine("缓存目录: ${cacheDir.absolutePath}")
+            diagnosis.appendLine()
+            
+            // PRoot目录检查 AWA
+            diagnosis.appendLine("【PRoot目录检查】")
+            val prootDir = File(filesDir, "proot")
+            diagnosis.appendLine("PRoot目录: ${prootDir.absolutePath}")
+            diagnosis.appendLine("目录存在: ${prootDir.exists()}")
+            diagnosis.appendLine("目录可读: ${prootDir.canRead()}")
+            diagnosis.appendLine("目录可写: ${prootDir.canWrite()}")
+            diagnosis.appendLine("目录可执行: ${prootDir.canExecute()}")
+            
+            if (prootDir.exists()) {
+                val files = prootDir.listFiles()
+                diagnosis.appendLine("目录内容: ${files?.map { it.name }?.joinToString() ?: "空"}")
+            }
+            diagnosis.appendLine()
+            
+            // PRoot二进制文件检查
+            diagnosis.appendLine("【PRoot二进制文件检查】")
+            val prootFile = File(prootDir, "proot")
+            diagnosis.appendLine("proot文件:")
+            diagnosis.appendLine("  路径: ${prootFile.absolutePath}")
+            diagnosis.appendLine("  存在: ${prootFile.exists()}")
+            if (prootFile.exists()) {
+                diagnosis.appendLine("  大小: ${prootFile.length()} bytes")
+                diagnosis.appendLine("  可读: ${prootFile.canRead()}")
+                diagnosis.appendLine("  可执行: ${prootFile.canExecute()}")
+                diagnosis.appendLine("  最后修改: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(prootFile.lastModified()))}")
+                
+                // 检查文件格式
+                try {
+                    val header = prootFile.readBytes().take(16)
+                    val elfMagic = byteArrayOf(0x7F, 0x45, 0x4C, 0x46)
+                    val isELF = header.take(4).zip(elfMagic.toList()).all { it.first == it.second }
+                    diagnosis.appendLine("  ELF格式: $isELF")
+                    diagnosis.appendLine("  文件头: ${header.joinToString(" ") { "0x%02X".format(it) }}")
+                } catch (e: Exception) {
+                    diagnosis.appendLine("  文件头读取失败: ${e.message}")
+                }
+            }
             diagnosis.appendLine()
             
             // FRP目录检查
@@ -1161,6 +1110,14 @@ class FRPService : Service() {
             
             // 建议
             diagnosis.appendLine("【诊断建议】")
+            if (!prootDir.exists()) {
+                diagnosis.appendLine("❌ PRoot目录不存在，请重新初始化")
+            } else if (!prootFile.exists()) {
+                diagnosis.appendLine("❌ PRoot二进制文件缺失，请重新安装")
+            } else if (!prootFile.canExecute()) {
+                diagnosis.appendLine("❌ PRoot文件没有执行权限，请检查权限设置")
+            }
+            
             if (!frpDir.exists()) {
                 diagnosis.appendLine("❌ FRP目录不存在，请重新初始化")
             } else if (!frpcFile.exists() || !frpsFile.exists()) {
@@ -1181,7 +1138,7 @@ class FRPService : Service() {
         
         val result = diagnosis.toString()
         LogManager.i(TAG, "FRP环境诊断完成")
-        LogManager.d(TAG, "诊断报告:\n$result")
+        LogManager.d(TAG, "诊断报告:\\n$result")
         
         return result
     }
