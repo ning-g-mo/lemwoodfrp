@@ -259,7 +259,7 @@ class FRPService : Service() {
             binaries.forEach { binary ->
                 try {
                     val targetFile = File(binDir, binary)
-                    copyAssetFile("$termuxAssetDir/bin/$binary", targetFile)
+                    copyAssetFile("$termuxAssetDir/$binary", targetFile)
                     
                     // 设置执行权限
                     targetFile.setExecutable(true, true)
