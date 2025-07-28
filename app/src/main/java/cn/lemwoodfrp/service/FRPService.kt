@@ -751,13 +751,14 @@ class FRPService : Service() {
 
     /**
      * 获取进程PID AWA
+     * 使用反射确保在所有Android版本和JVM上的兼容性 qwq
      */
     private fun getPid(process: Process): String {
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                process.pid().toString()
+            val method = process.javaClass.methods.firstOrNull { it.name == "pid" && it.parameterCount == 0 }
+            if (method != null) {
+                method.invoke(process)?.toString() ?: "未知"
             } else {
-                // 反射获取PID (API < 26)
                 val field = process.javaClass.getDeclaredField("pid")
                 field.isAccessible = true
                 field.getInt(process).toString()
