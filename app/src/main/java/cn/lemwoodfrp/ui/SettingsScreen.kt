@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import cn.lemwoodfrp.R
 import cn.lemwoodfrp.service.FRPService
 import cn.lemwoodfrp.utils.BatteryOptimizationUtils
-import cn.lemwoodfrp.utils.ConfigManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import cn.lemwoodfrp.utils.ConfigManager
