@@ -45,6 +45,14 @@ class FRPService : Service() {
 
     override fun onBind(intent: Intent?): IBinder = binder
 
+    /**
+     * 获取应用私有目录 qwq
+     * 使用 /data/data/cn.lemwoodfrp/ 目录来避免权限问题
+     */
+    private fun getAppPrivateDir(): File {
+        return File("/data/data/cn.lemwoodfrp")
+    }
+
     override fun onCreate() {
         super.onCreate()
         LogManager.i(TAG, "🎯 FRPService 创建")
@@ -99,7 +107,7 @@ class FRPService : Service() {
         try {
             LogManager.i(TAG, "🔧 开始初始化PRoot环境")
             
-            val prootDir = File(filesDir, "proot")
+            val prootDir = File(getAppPrivateDir(), "proot")
             if (!prootDir.exists()) {
                 prootDir.mkdirs()
                 LogManager.d(TAG, "创建PRoot目录: ${prootDir.absolutePath}")
@@ -180,7 +188,7 @@ class FRPService : Service() {
         try {
             LogManager.i(TAG, "🔧 开始初始化FRP二进制文件")
             
-            val frpDir = File(filesDir, "frp")
+            val frpDir = File(getAppPrivateDir(), "frp")
             if (!frpDir.exists()) {
                 frpDir.mkdirs()
                 LogManager.d(TAG, "创建FRP目录: ${frpDir.absolutePath}")
@@ -370,8 +378,8 @@ class FRPService : Service() {
         try {
             LogManager.i(TAG, "🐧 使用PRoot启动FRP进程", configId)
             
-            val prootFile = File(filesDir, "proot/proot")
-            val frpDir = File(filesDir, "frp")
+            val prootFile = File(getAppPrivateDir(), "proot/proot")
+            val frpDir = File(getAppPrivateDir(), "frp")
             val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
             val frpExecutable = File(frpDir, executable)
             val configFile = File(frpDir, "$configId.toml")
@@ -417,7 +425,7 @@ class FRPService : Service() {
         try {
             LogManager.i(TAG, "🔧 直接启动FRP进程", configId)
             
-            val frpDir = File(filesDir, "frp")
+            val frpDir = File(getAppPrivateDir(), "frp")
             val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
             val frpExecutable = File(frpDir, executable)
             val configFile = File(frpDir, "$configId.toml")
@@ -480,7 +488,7 @@ class FRPService : Service() {
                 LogManager.i(TAG, "-" + "-".repeat(39), configId)  // 修复乘法操作
                 LogManager.i(TAG, "🔍 环境检查", configId)
                 
-                val frpDir = File(filesDir, "frp")
+                val frpDir = File(getAppPrivateDir(), "frp")
                 val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
                 val frpExecutable = File(frpDir, executable)
                 
@@ -541,7 +549,7 @@ class FRPService : Service() {
                 var startMethod = ""
                 
                 // 首先尝试PRoot启动
-                val prootFile = File(filesDir, "proot/proot")
+                val prootFile = File(getAppPrivateDir(), "proot/proot")
                 if (prootFile.exists() && prootFile.canExecute()) {
                     LogManager.i(TAG, "🐧 尝试使用PRoot启动", configId)
                     process = startFRPWithPRoot(configId, config)
@@ -811,7 +819,7 @@ class FRPService : Service() {
             
             // PRoot环境检查
             diagnosis.appendLine("【PRoot环境检查】")
-            val prootDir = File(filesDir, "proot")
+            val prootDir = File(getAppPrivateDir(), "proot")
             val prootFile = File(prootDir, "proot")
             
             diagnosis.appendLine("PRoot目录:")
@@ -831,7 +839,7 @@ class FRPService : Service() {
             
             // FRP环境检查
             diagnosis.appendLine("【FRP环境检查】")
-            val frpDir = File(filesDir, "frp")
+            val frpDir = File(getAppPrivateDir(), "frp")
             diagnosis.appendLine("FRP目录:")
             diagnosis.appendLine("  路径: ${frpDir.absolutePath}")
             diagnosis.appendLine("  存在: ${frpDir.exists()}")
