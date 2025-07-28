@@ -50,7 +50,7 @@ class FRPService : Service() {
      * 使用 /data/data/cn.lemwoodfrp/ 目录来避免权限问题
      */
     private fun getAppPrivateDir(): File {
-        return File("/data/data/cn.lemwoodfrp")
+        return File(applicationContext.applicationInfo.nativeLibraryDir)
     }
 
     /**
