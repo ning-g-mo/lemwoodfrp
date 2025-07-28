@@ -415,18 +415,18 @@ class FRPService : Service() {
     private suspend fun initializeFRPBinaries() = withContext(Dispatchers.IO) {
         try {
             LogManager.i(TAG, "🔧 开始初始化FRP二进制文件")
-            
-            val frpDir = File(getAppPrivateDir(), "frp")
+
+            val frpDir = getAppPrivateDir()
             if (!frpDir.exists()) {
                 frpDir.mkdirs()
                 LogManager.d(TAG, "创建FRP目录: ${frpDir.absolutePath}")
             }
-            
+
             val architecture = detectArchitecture()
             val frpAssetDir = "frp/$architecture"
-            
+
             LogManager.i(TAG, "使用FRP资源目录: $frpAssetDir")
-            
+
             // 复制frpc
             val frpcFile = File(frpDir, "frpc")
             LogManager.d(TAG, "开始处理frpc文件: ${frpcFile.absolutePath}")
@@ -559,28 +559,33 @@ class FRPService : Service() {
     private fun copyAssetFile(assetPath: String, targetFile: File) {
         try {
             LogManager.d(TAG, "复制资源文件: $assetPath -> ${targetFile.absolutePath}")
-            
+
+            // 如果文件已存在，先删除，确保覆盖 qwq
+            if (targetFile.exists()) {
+                targetFile.delete()
+            }
+
             assets.open(assetPath).use { inputStream ->
                 targetFile.outputStream().use { outputStream ->
                     val buffer = ByteArray(8192)
                     var bytesRead: Int
                     var totalBytes = 0
-                    
+
                     while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                         outputStream.write(buffer, 0, bytesRead)
                         totalBytes += bytesRead
                     }
-                    
+
                     LogManager.d(TAG, "文件复制完成: $totalBytes bytes")
                 }
             }
-            
+
             if (targetFile.exists()) {
                 LogManager.s(TAG, "✅ 文件复制成功: ${targetFile.name} (${targetFile.length()} bytes)")
             } else {
                 LogManager.e(TAG, "❌ 文件复制后不存在: ${targetFile.name}")
             }
-            
+
         } catch (e: FileNotFoundException) {
             LogManager.e(TAG, "❌ 资源文件不存在: $assetPath")
             LogManager.e(TAG, "请确保assets目录包含正确的FRP二进制文件")
@@ -598,9 +603,9 @@ class FRPService : Service() {
     private fun startFRPWithPRoot(configId: String, config: FRPConfig): Process? {
         try {
             LogManager.i(TAG, "🐧 使用PRoot启动FRP进程", configId)
-            
+
             val prootFile = File(getAppPrivateDir(), "proot/proot")
-            val frpDir = File(getAppPrivateDir(), "frp")
+            val frpDir = getAppPrivateDir()
             val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
             val frpExecutable = File(frpDir, executable)
             val configFile = File(frpDir, "$configId.toml")
@@ -645,8 +650,8 @@ class FRPService : Service() {
     private fun startFRPDirect(configId: String, config: FRPConfig): Process? {
         try {
             LogManager.i(TAG, "🔧 直接启动FRP进程", configId)
-            
-            val frpDir = File(getAppPrivateDir(), "frp")
+
+            val frpDir = getAppPrivateDir()
             val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
             val frpExecutable = File(frpDir, executable)
             val configFile = File(frpDir, "$configId.toml")
@@ -708,8 +713,8 @@ class FRPService : Service() {
                 // 环境检查 qwq
                 LogManager.i(TAG, "-" + "-".repeat(39), configId)  // 修复乘法操作
                 LogManager.i(TAG, "🔍 环境检查", configId)
-                
-                val frpDir = File(getAppPrivateDir(), "frp")
+
+                val frpDir = getAppPrivateDir()
                 val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
                 val frpExecutable = File(frpDir, executable)
                 
@@ -758,7 +763,7 @@ class FRPService : Service() {
                 // 创建配置文件
                 LogManager.i(TAG, "📝 创建配置文件", configId)
                 val configContent = createConfigFile(config)
-                val configFile = File(frpDir, "$configId.toml")
+                val configFile = File(getAppPrivateDir(), "$configId.toml")
                 configFile.writeText(configContent)
                 LogManager.d(TAG, "配置文件路径: ${configFile.absolutePath}", configId)
                 LogManager.d(TAG, "配置文件内容:\\n$configContent", configId)
