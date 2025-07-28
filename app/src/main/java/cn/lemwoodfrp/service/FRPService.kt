@@ -12,9 +12,9 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import cn.lemwoodfrp.MainActivity
+import cn.lemwoodfrp.ui.MainActivity
 import cn.lemwoodfrp.R
-import cn.lemwoodfrp.manager.ConfigManager
+import cn.lemwoodfrp.utils.ConfigManager
 import cn.lemwoodfrp.model.FRPConfig
 import cn.lemwoodfrp.model.FRPType
 import cn.lemwoodfrp.utils.LogManager
@@ -405,7 +405,7 @@ class FRPService : Service() {
             return processBuilder.start()
             
         } catch (e: Exception) {
-            LogManager.e(TAG, "❌ PRoot启动失败: ${e.message}", configId)
+            LogManager.e(TAG, "❌ PRoot启动失败: ${e.message}", e, configId)
             return null
         }
     }
@@ -437,7 +437,7 @@ class FRPService : Service() {
             return processBuilder.start()
             
         } catch (e: Exception) {
-            LogManager.e(TAG, "❌ 直接启动失败: ${e.message}", configId)
+            LogManager.e(TAG, "❌ 直接启动失败: ${e.message}", e, configId)
             return null
         }
     }
@@ -457,7 +457,7 @@ class FRPService : Service() {
                 val config = getConfigById(configId)
                 if (config == null) {
                     LogManager.e(TAG, "❌ 配置不存在: $configId", configId = configId)
-                    LogManager.e(TAG, "可用配置列表: ${ConfigManager.getAllConfigs(this@FRPService).map { "${it.id}(${it.name})" }.joinToString()}", configId = configId)
+                    LogManager.e(TAG, "可用配置列表: ${cn.lemwoodfrp.utils.ConfigManager.getAllConfigs(this@FRPService).map { config -> "${config.id}(${config.name})" }.joinToString()}", configId = configId)
                     return@launch
                 }
                 
@@ -521,7 +521,7 @@ class FRPService : Service() {
                             return@launch
                         }
                     } catch (e: Exception) {
-                        LogManager.e(TAG, "❌ 设置执行权限时出错: ${e.message}", configId = configId)
+                        LogManager.e(TAG, "❌ 设置执行权限时出错: ${e.message}", e, configId)
                         return@launch
                     }
                 }
@@ -717,7 +717,7 @@ class FRPService : Service() {
      */
     private fun getConfigById(configId: String): FRPConfig? {
         return try {
-            ConfigManager.getAllConfigs(this).find { config -> config.id == configId }
+           return cn.lemwoodfrp.utils.ConfigManager.getAllConfigs(this).find { config: cn.lemwoodfrp.utils.FRPConfig -> config.id == configId }
         } catch (e: Exception) {
             LogManager.e(TAG, "获取配置失败: ${e.message}")
             null
