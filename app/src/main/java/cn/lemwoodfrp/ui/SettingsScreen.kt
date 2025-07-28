@@ -20,6 +20,10 @@ import cn.lemwoodfrp.R
 import cn.lemwoodfrp.service.FRPService
 import cn.lemwoodfrp.utils.BatteryOptimizationUtils
 import cn.lemwoodfrp.utils.ConfigManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import cn.lemwoodfrp.utils.ConfigManager
+import java.io.InputStreamReader
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +69,30 @@ fun SettingsScreen() {
         }
     }
     
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+        onResult = { uri ->
+            uri?.let {
+                context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                    val json = ConfigManager.exportConfigs(context)
+                    outputStream.write(json.toByteArray())
+                }
+            }
+        }
+    )
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri ->
+            uri?.let {
+                context.contentResolver.openInputStream(it)?.use { inputStream ->
+                    val json = InputStreamReader(inputStream).readText()
+                    ConfigManager.importConfigs(context, json)
+                }
+            }
+        }
+    )
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -125,6 +153,43 @@ fun SettingsScreen() {
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(if (isLoadingDiagnosis) "诊断中..." else "开始环境诊断 喵～")
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "配置管理",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { exportLauncher.launch("frp_configs.json") },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("导出配置")
+                        }
+                        Button(
+                            onClick = { importLauncher.launch("application/json") },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("导入配置")
+                        }
                     }
                 }
             }
@@ -251,6 +316,76 @@ fun SettingsScreen() {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(stringResource(R.string.app_settings))
                     }
+                }
+            }
+        }
+        
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "配置管理",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    val exportLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.CreateDocument("application/json"),
+                        onResult = { uri ->
+                            uri?.let {
+                                try {
+                                    val json = ConfigManager.exportConfigs(context)
+                                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                                        outputStream.write(json.toByteArray())
+                                    }
+                                } catch (e: Exception) {
+                                    // Handle exception
+                                }
+                            }
+                        }
+                    )
+
+                    val importLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.GetContent(),
+                        onResult = { uri ->
+                            uri?.let {
+                                try {
+                                    context.contentResolver.openInputStream(it)?.use { inputStream ->
+                                        val json = InputStreamReader(inputStream).readText()
+                                        ConfigManager.importConfigs(context, json)
+                                    }
+                                } catch (e: Exception) {
+                                    // Handle exception
+                                }
+                            }
+                        }
+                    )
+
+                    Row(
+                         modifier = Modifier.fillMaxWidth(),
+                         horizontalArrangement = Arrangement.spacedBy(8.dp)
+                     ) {
+                         Button(
+                             onClick = { exportLauncher.launch("lemwoodfrp_configs.json") },
+                             modifier = Modifier.weight(1f)
+                         ) {
+                             Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
+                             Spacer(modifier = Modifier.width(8.dp))
+                             Text("导出配置")
+                         }
+                         Button(
+                             onClick = { importLauncher.launch("application/json") },
+                             modifier = Modifier.weight(1f)
+                         ) {
+                             Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                             Spacer(modifier = Modifier.width(8.dp))
+                             Text("导入配置")
+                         }
+                     }
                 }
             }
         }

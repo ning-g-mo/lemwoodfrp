@@ -95,6 +95,28 @@ object ConfigManager {
     fun setLastVersionCheckTime(context: Context, time: Long) {
         getPrefs(context).edit().putLong(KEY_LAST_VERSION_CHECK, time).apply()
     }
+
+    /**
+     * 导出配置到JSON字符串
+     */
+    fun exportConfigs(context: Context): String {
+        val configs = getConfigs(context)
+        return NetworkManager.gson.toJson(configs)
+    }
+
+    /**
+     * 从JSON字符串导入配置
+     */
+    fun importConfigs(context: Context, json: String): Boolean {
+        return try {
+            val type = object : TypeToken<List<FRPConfig>>() {}.type
+            val configs = NetworkManager.gson.fromJson<List<FRPConfig>>(json, type)
+            saveConfigs(context, configs)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
     
     // 添加方法别名以匹配代码中使用的方法名
     fun getAllConfigs(context: Context): List<FRPConfig> = getConfigs(context)
