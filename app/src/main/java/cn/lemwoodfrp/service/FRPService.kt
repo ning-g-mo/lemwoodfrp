@@ -457,7 +457,7 @@ class FRPService : Service() {
                 val config = getConfigById(configId)
                 if (config == null) {
                     LogManager.e(TAG, "❌ 配置不存在: $configId", configId = configId)
-                    LogManager.e(TAG, "可用配置列表: ${cn.lemwoodfrp.utils.ConfigManager.getAllConfigs(this@FRPService).map { config -> "${config.id}(${config.name})" }.joinToString()}", configId = configId)
+                    LogManager.e(TAG, "可用配置列表: ${ConfigManager.getAllConfigs(this@FRPService).map { config -> "${config.id}(${config.name})" }.joinToString()}", configId = configId)
                     return@launch
                 }
                 
@@ -715,9 +715,9 @@ class FRPService : Service() {
     /**
      * 获取配置信息
      */
-    private fun getConfigById(configId: String): cn.lemwoodfrp.utils.FRPConfig? {
+    private fun getConfigById(configId: String): FRPConfig? {
         return try {
-           cn.lemwoodfrp.utils.ConfigManager.getAllConfigs(this).find { config: cn.lemwoodfrp.utils.FRPConfig -> config.id == configId }
+           ConfigManager.getAllConfigs(this).find { config -> config.id == configId }
         } catch (e: Exception) {
             LogManager.e(TAG, "获取配置失败: ${e.message}")
             null
