@@ -159,10 +159,22 @@ class FRPService : Service() {
                 // 简单验证：检查文件大小是否合理
                 if (prootFile.length() > 100 * 1024) { // 大于100KB
                     LogManager.d(TAG, "现有PRoot文件看起来有效，跳过复制")
-                    // 确保执行权限
+                    // 确保执行权限 - 使用双重权限设置 qwq
                     if (!prootFile.canExecute()) {
-                        val success = prootFile.setExecutable(true, true)
-                        LogManager.d(TAG, "设置PRoot执行权限，结果: $success")
+                        try {
+                            val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${prootFile.absolutePath}")
+                            val chmodResult = chmodProcess.waitFor()
+                            LogManager.d(TAG, "现有PRoot chmod结果: $chmodResult")
+                            
+                            // 备用方法：使用Java API
+                            val success = prootFile.setExecutable(true, true)
+                            LogManager.d(TAG, "现有PRoot setExecutable结果: $success")
+                        } catch (e: Exception) {
+                            LogManager.w(TAG, "设置现有PRoot权限时出错: ${e.message}")
+                            // 尝试备用方法
+                            val success = prootFile.setExecutable(true, true)
+                            LogManager.d(TAG, "现有PRoot setExecutable备用结果: $success")
+                        }
                     }
                     return@withContext
                 }
@@ -497,10 +509,22 @@ class FRPService : Service() {
                         frpcFile.delete()
                     } else if (frpcFile.length() > 1024 * 1024) { // 大于1MB
                         LogManager.d(TAG, "现有frpc文件看起来有效，跳过复制")
-                        // 确保执行权限
+                        // 确保执行权限 - 使用双重权限设置 qwq
                         if (!frpcFile.canExecute()) {
-                            val success = frpcFile.setExecutable(true, true)
-                            LogManager.d(TAG, "设置frpc执行权限，结果: $success")
+                            try {
+                                val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${frpcFile.absolutePath}")
+                                val chmodResult = chmodProcess.waitFor()
+                                LogManager.d(TAG, "现有frpc chmod结果: $chmodResult")
+                                
+                                // 备用方法：使用Java API
+                                val success = frpcFile.setExecutable(true, true)
+                                LogManager.d(TAG, "现有frpc setExecutable结果: $success")
+                            } catch (e: Exception) {
+                                LogManager.w(TAG, "设置现有frpc权限时出错: ${e.message}")
+                                // 尝试备用方法
+                                val success = frpcFile.setExecutable(true, true)
+                                LogManager.d(TAG, "现有frpc setExecutable备用结果: $success")
+                            }
                         }
                     } else {
                         LogManager.w(TAG, "现有frpc文件太小，重新复制")
@@ -553,10 +577,22 @@ class FRPService : Service() {
                         frpsFile.delete()
                     } else if (frpsFile.length() > 1024 * 1024) { // 大于1MB
                         LogManager.d(TAG, "现有frps文件看起来有效，跳过复制")
-                        // 确保执行权限
+                        // 确保执行权限 - 使用双重权限设置 qwq
                         if (!frpsFile.canExecute()) {
-                            val success = frpsFile.setExecutable(true, true)
-                            LogManager.d(TAG, "设置frps执行权限，结果: $success")
+                            try {
+                                val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${frpsFile.absolutePath}")
+                                val chmodResult = chmodProcess.waitFor()
+                                LogManager.d(TAG, "现有frps chmod结果: $chmodResult")
+                                
+                                // 备用方法：使用Java API
+                                val success = frpsFile.setExecutable(true, true)
+                                LogManager.d(TAG, "现有frps setExecutable结果: $success")
+                            } catch (e: Exception) {
+                                LogManager.w(TAG, "设置现有frps权限时出错: ${e.message}")
+                                // 尝试备用方法
+                                val success = frpsFile.setExecutable(true, true)
+                                LogManager.d(TAG, "现有frps setExecutable备用结果: $success")
+                            }
                         }
                     } else {
                         LogManager.w(TAG, "现有frps文件太小，重新复制")
@@ -571,14 +607,24 @@ class FRPService : Service() {
             if (!frpsFile.exists()) {
                 copyAssetFile("$frpAssetDir/frps", frpsFile)
                 
-                // 设置执行权限
-                val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${frpsFile.absolutePath}")
-                val chmodResult = chmodProcess.waitFor()
-                val errorOutput = chmodProcess.errorStream.bufferedReader().readText()
-                if (errorOutput.isNotEmpty()) {
-                    LogManager.w(TAG, "chmod frps 错误输出: $errorOutput")
+                // 设置执行权限 - 使用chmod命令确保权限正确 qwq
+                try {
+                    val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${frpsFile.absolutePath}")
+                    val chmodResult = chmodProcess.waitFor()
+                    val errorOutput = chmodProcess.errorStream.bufferedReader().readText()
+                    if (errorOutput.isNotEmpty()) {
+                        LogManager.w(TAG, "chmod frps 错误输出: $errorOutput")
+                    }
+                    LogManager.d(TAG, "frps chmod结果: $chmodResult")
+                    
+                    // 备用方法：使用Java API
+                    val success = frpsFile.setExecutable(true, true)
+                    LogManager.d(TAG, "frps setExecutable结果: $success")
+                } catch (e: Exception) {
+                    LogManager.w(TAG, "设置frps权限时出错: ${e.message}")
+                    // 尝试备用方法
+                    frpsFile.setExecutable(true, true)
                 }
-                LogManager.d(TAG, "frps chmod结果: $chmodResult")
             }
             
             // 验证所有文件
