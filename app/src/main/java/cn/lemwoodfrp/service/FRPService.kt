@@ -51,7 +51,7 @@ class FRPService : Service() {
      * 使用 /data/data/cn.lemwoodfrp/ 目录来避免权限问题
      */
     private fun getAppPrivateDir(): File {
-        return File(applicationContext.applicationInfo.nativeLibraryDir)
+        return applicationContext.filesDir
     }
 
     /**
@@ -179,12 +179,34 @@ class FRPService : Service() {
                 
                 LogManager.s(TAG, "✅ PRoot复制完成，大小: ${prootFile.length()} bytes")
                 
-                // 设置执行权限
-                val success = prootFile.setExecutable(true, true)
-                if (success) {
-                    LogManager.s(TAG, "✅ PRoot执行权限设置成功")
-                } else {
-                    LogManager.w(TAG, "⚠️ PRoot执行权限设置可能失败")
+                // 设置执行权限 - 使用chmod命令确保权限正确 qwq
+                try {
+                    val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${prootFile.absolutePath}")
+                    val chmodResult = chmodProcess.waitFor()
+                    val errorOutput = chmodProcess.errorStream.bufferedReader().readText()
+                    if (errorOutput.isNotEmpty()) {
+                        LogManager.w(TAG, "chmod proot 错误输出: $errorOutput")
+                    }
+                    LogManager.d(TAG, "proot chmod结果: $chmodResult")
+                    
+                    // 备用方法：使用Java API
+                    val success = prootFile.setExecutable(true, true)
+                    LogManager.d(TAG, "proot setExecutable结果: $success")
+                    
+                    if (success) {
+                        LogManager.s(TAG, "✅ PRoot执行权限设置成功")
+                    } else {
+                        LogManager.w(TAG, "⚠️ PRoot执行权限设置可能失败")
+                    }
+                } catch (e: Exception) {
+                    LogManager.w(TAG, "设置proot权限时出错: ${e.message}")
+                    // 尝试备用方法
+                    val success = prootFile.setExecutable(true, true)
+                    if (success) {
+                        LogManager.s(TAG, "✅ PRoot执行权限设置成功（备用方法）")
+                    } else {
+                        LogManager.w(TAG, "⚠️ PRoot执行权限设置失败")
+                    }
                 }
                 
                 // 验证文件
@@ -268,8 +290,19 @@ class FRPService : Service() {
                     // 修复路径：assets中的二进制文件在bin子目录下 喵～
                     copyAssetFile("$termuxAssetDir/bin/$binary", targetFile)
                     
-                    // 设置执行权限
-                    targetFile.setExecutable(true, true)
+                    // 设置执行权限 - 使用chmod命令确保权限正确 qwq
+                    try {
+                        val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${targetFile.absolutePath}")
+                        val chmodResult = chmodProcess.waitFor()
+                        LogManager.d(TAG, "$binary chmod结果: $chmodResult")
+                        
+                        // 备用方法：使用Java API
+                        targetFile.setExecutable(true, true)
+                    } catch (e: Exception) {
+                        LogManager.w(TAG, "设置$binary 权限时出错: ${e.message}")
+                        // 尝试备用方法
+                        targetFile.setExecutable(true, true)
+                    }
                     
                 } catch (e: FileNotFoundException) {
                     LogManager.w(TAG, "Termux二进制文件不存在: $binary，跳过")
@@ -300,7 +333,21 @@ class FRPService : Service() {
             try {
                 copyAssetFile("termux/startup.sh", File(termuxRoot, "startup.sh"))
                 val startupFile = File(termuxRoot, "startup.sh")
-                startupFile.setExecutable(true, true)
+                
+                // 设置执行权限 - 使用chmod命令确保权限正确 qwq
+                try {
+                    val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${startupFile.absolutePath}")
+                    val chmodResult = chmodProcess.waitFor()
+                    LogManager.d(TAG, "startup.sh chmod结果: $chmodResult")
+                    
+                    // 备用方法：使用Java API
+                    startupFile.setExecutable(true, true)
+                } catch (e: Exception) {
+                    LogManager.w(TAG, "设置startup.sh权限时出错: ${e.message}")
+                    // 尝试备用方法
+                    startupFile.setExecutable(true, true)
+                }
+                
                 LogManager.d(TAG, "复制启动脚本成功 qwq")
             } catch (e: Exception) {
                 LogManager.w(TAG, "复制启动脚本失败: ${e.message}")
@@ -468,9 +515,24 @@ class FRPService : Service() {
             if (!frpcFile.exists()) {
                 copyAssetFile("$frpAssetDir/frpc", frpcFile)
                 
-                // 设置执行权限
-                val success = frpcFile.setExecutable(true, true)
-                LogManager.d(TAG, "frpc setExecutable结果: $success")
+                // 设置执行权限 - 使用chmod命令确保权限正确 qwq
+                try {
+                    val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${frpcFile.absolutePath}")
+                    val chmodResult = chmodProcess.waitFor()
+                    val errorOutput = chmodProcess.errorStream.bufferedReader().readText()
+                    if (errorOutput.isNotEmpty()) {
+                        LogManager.w(TAG, "chmod frpc 错误输出: $errorOutput")
+                    }
+                    LogManager.d(TAG, "frpc chmod结果: $chmodResult")
+                    
+                    // 备用方法：使用Java API
+                    val success = frpcFile.setExecutable(true, true)
+                    LogManager.d(TAG, "frpc setExecutable结果: $success")
+                } catch (e: Exception) {
+                    LogManager.w(TAG, "设置frpc权限时出错: ${e.message}")
+                    // 尝试备用方法
+                    frpcFile.setExecutable(true, true)
+                }
             }
             
             // 复制frps
