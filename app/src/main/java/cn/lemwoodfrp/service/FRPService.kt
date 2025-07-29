@@ -38,6 +38,7 @@ class FRPService : Service() {
     private val runningProcesses = ConcurrentHashMap<String, Process>()
     private val processStatus = ConcurrentHashMap<String, String>()
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var initializationJob: Job? = null  // 跟踪初始化任务 喵～
 
     inner class FRPBinder : Binder() {
         fun getService(): FRPService = this@FRPService
@@ -78,7 +79,7 @@ class FRPService : Service() {
         createNotificationChannel()
         
         // 初始化PRoot、Termux和FRP环境 AWA
-        serviceScope.launch {
+        initializationJob = serviceScope.launch {
             try {
                 initializePRoot()
                 initializeTermuxEnvironment()
@@ -97,7 +98,12 @@ class FRPService : Service() {
             "start_frp" -> {
                 val configId = intent.getStringExtra("config_id")
                 if (configId != null) {
-                    startFRPProcess(configId)
+                    // 等待初始化完成后再启动FRP进程 喵～
+                    serviceScope.launch {
+                        // 等待初始化完成
+                        initializationJob?.join()
+                        startFRPProcess(configId)
+                    }
                 } else {
                     LogManager.e(TAG, "❌ 启动FRP失败: 配置ID为空")
                 }
@@ -259,7 +265,8 @@ class FRPService : Service() {
             binaries.forEach { binary ->
                 try {
                     val targetFile = File(binDir, binary)
-                    copyAssetFile("$termuxAssetDir/$binary", targetFile)
+                    // 修复路径：assets中的二进制文件在bin子目录下 喵～
+                    copyAssetFile("$termuxAssetDir/bin/$binary", targetFile)
                     
                     // 设置执行权限
                     targetFile.setExecutable(true, true)
@@ -343,7 +350,7 @@ class FRPService : Service() {
             LogManager.i(TAG, "🐧 使用Termux环境启动FRP进程", configId)
             
             val termuxRoot = getTermuxRootDir()
-            val frpDir = File(getAppPrivateDir(), "frp")
+            val frpDir = getAppPrivateDir()
             val executable = if (config.type == FRPType.CLIENT) "frpc" else "frps"
             val frpExecutable = File(frpDir, executable)
             val configFile = File(frpDir, "$configId.toml")
@@ -410,17 +417,15 @@ class FRPService : Service() {
     }
 
     /**
-     * 初始化FRP二进制文件
+     * 初始化FRP二进制文件 qwq
      */
     private suspend fun initializeFRPBinaries() = withContext(Dispatchers.IO) {
         try {
             LogManager.i(TAG, "🔧 开始初始化FRP二进制文件")
 
             val frpDir = getAppPrivateDir()
-            if (!frpDir.exists()) {
-                frpDir.mkdirs()
-                LogManager.d(TAG, "创建FRP目录: ${frpDir.absolutePath}")
-            }
+            // 不需要创建目录，因为nativeLibraryDir已经存在 喵～
+            LogManager.d(TAG, "使用FRP目录: ${frpDir.absolutePath}")
 
             val architecture = detectArchitecture()
             val frpAssetDir = "frp/$architecture"
